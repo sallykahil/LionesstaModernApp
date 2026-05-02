@@ -1,0 +1,831 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lionessta Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --rose: #c9907a;
+            --rose-light: #e8c4b8;
+            --rose-pale: #f5e8e3;
+            --cream: #f8f3ee;
+            --cream-dark: #efe6dc;
+            --taupe: #a08070;
+            --taupe-dark: #5c4840;
+            --white: #fdfaf7;
+            --ink: #3a2e28;
+            --success: #7a9e7e;
+            --error: #c9706a;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--cream);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        /* ── LOGIN SCREEN ── */
+        #login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--cream) 0%, var(--rose-pale) 100%);
+        }
+
+        .login-box {
+            background: var(--white);
+            padding: 3rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(60,40,30,.12);
+        }
+
+            .login-box h1 {
+                font-family: 'Playfair Display', serif;
+                font-size: 2rem;
+                font-weight: 400;
+                color: var(--taupe-dark);
+                margin-bottom: .4rem;
+            }
+
+            .login-box p {
+                font-size: .85rem;
+                color: var(--taupe);
+                margin-bottom: 2rem;
+            }
+
+        /* ── FORM ELEMENTS ── */
+        .field {
+            margin-bottom: 1.2rem;
+        }
+
+            .field label {
+                display: block;
+                font-size: .7rem;
+                letter-spacing: .18em;
+                text-transform: uppercase;
+                color: var(--taupe);
+                margin-bottom: .5rem;
+            }
+
+            .field input, .field select {
+                width: 100%;
+                padding: .75rem 1rem;
+                border: 1px solid var(--rose-light);
+                background: var(--white);
+                font-family: 'DM Sans', sans-serif;
+                font-size: .9rem;
+                color: var(--ink);
+                outline: none;
+                transition: border-color .3s;
+            }
+
+                .field input:focus, .field select:focus {
+                    border-color: var(--rose);
+                }
+
+        .btn {
+            width: 100%;
+            padding: .85rem;
+            background: var(--taupe-dark);
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            font-size: .75rem;
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+            transition: background .3s;
+        }
+
+            .btn:hover {
+                background: var(--rose);
+            }
+
+            .btn:disabled {
+                background: var(--taupe);
+                cursor: not-allowed;
+            }
+
+        .btn-sm {
+            width: auto;
+            padding: .5rem 1.2rem;
+            font-size: .68rem;
+        }
+
+        .btn-danger {
+            background: var(--error);
+        }
+
+            .btn-danger:hover {
+                background: #a85550;
+            }
+
+        .btn-ghost-sm {
+            background: transparent;
+            color: var(--taupe);
+            border: 1px solid var(--rose-light);
+        }
+
+            .btn-ghost-sm:hover {
+                background: var(--rose-pale);
+                color: var(--ink);
+            }
+
+        /* ── TOAST ── */
+        #toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: .9rem 1.6rem;
+            font-size: .8rem;
+            letter-spacing: .1em;
+            color: #fff;
+            border-radius: 2px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s, transform .3s;
+            transform: translateY(10px);
+            z-index: 999;
+        }
+
+            #toast.show {
+                opacity: 1;
+                transform: none;
+            }
+
+            #toast.success {
+                background: var(--success);
+            }
+
+            #toast.error {
+                background: var(--error);
+            }
+
+        /* ── DASHBOARD ── */
+        #dashboard {
+            display: none;
+        }
+
+        .topbar {
+            background: var(--taupe-dark);
+            padding: 1rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .topbar-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: #fff;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+            .topbar-right span {
+                font-size: .75rem;
+                color: rgba(255,255,255,.6);
+            }
+
+        .logout-btn {
+            font-size: .7rem;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            color: var(--rose-light);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: color .3s;
+        }
+
+            .logout-btn:hover {
+                color: #fff;
+            }
+
+        .dashboard-body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2.5rem;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 2.5rem;
+            align-items: start;
+        }
+
+        /* ── UPLOAD CARD ── */
+        .card {
+            background: var(--white);
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(60,40,30,.08);
+        }
+
+            .card h2 {
+                font-family: 'Playfair Display', serif;
+                font-size: 1.3rem;
+                font-weight: 400;
+                color: var(--taupe-dark);
+                margin-bottom: 1.5rem;
+                padding-bottom: .8rem;
+                border-bottom: 1px solid var(--cream-dark);
+            }
+
+        /* File drop zone */
+        .drop-zone {
+            border: 2px dashed var(--rose-light);
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.2rem;
+            transition: border-color .3s, background .3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+            .drop-zone:hover, .drop-zone.dragover {
+                border-color: var(--rose);
+                background: var(--rose-pale);
+            }
+
+            .drop-zone input[type="file"] {
+                position: absolute;
+                inset: 0;
+                opacity: 0;
+                cursor: pointer;
+                width: 100%;
+                height: 100%;
+            }
+
+        .drop-zone-icon {
+            font-size: 2rem;
+            margin-bottom: .5rem;
+        }
+
+        .drop-zone p {
+            font-size: .8rem;
+            color: var(--taupe);
+        }
+
+        .drop-zone strong {
+            color: var(--rose);
+        }
+
+        /* Image preview */
+        #preview-wrap {
+            display: none;
+            margin-bottom: 1.2rem;
+            position: relative;
+        }
+
+            #preview-wrap img {
+                width: 100%;
+                max-height: 280px;
+                object-fit: cover;
+                display: block;
+            }
+
+            #preview-wrap .remove-preview {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(58,46,40,.7);
+                color: #fff;
+                border: none;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                font-size: .9rem;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+        /* ── IMAGE GRID ── */
+        .images-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+            .images-header h2 {
+                font-family: 'Playfair Display', serif;
+                font-size: 1.3rem;
+                font-weight: 400;
+                color: var(--taupe-dark);
+            }
+
+            .images-header span {
+                font-size: .75rem;
+                color: var(--taupe);
+            }
+
+        .filter-bar {
+            display: flex;
+            gap: .4rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .ftab {
+            padding: .4rem 1rem;
+            border: 1px solid var(--rose-light);
+            background: transparent;
+            font-family: 'DM Sans', sans-serif;
+            font-size: .68rem;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            color: var(--taupe);
+            cursor: pointer;
+            transition: all .3s;
+        }
+
+            .ftab.active, .ftab:hover {
+                background: var(--taupe-dark);
+                border-color: var(--taupe-dark);
+                color: #fff;
+            }
+
+        .img-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .img-card {
+            background: var(--cream-dark);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .img-card img {
+                width: 100%;
+                height: 160px;
+                object-fit: cover;
+                display: block;
+                transition: transform .3s;
+            }
+
+            .img-card:hover img {
+                transform: scale(1.04);
+            }
+
+        .img-card-info {
+            padding: .7rem;
+            background: var(--white);
+            border-top: 1px solid var(--cream-dark);
+        }
+
+            .img-card-info strong {
+                display: block;
+                font-size: .78rem;
+                color: var(--ink);
+                margin-bottom: .2rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .img-card-info span {
+                font-size: .68rem;
+                color: var(--taupe);
+                letter-spacing: .1em;
+                text-transform: uppercase;
+            }
+
+        .img-card-actions {
+            display: flex;
+            gap: .4rem;
+            margin-top: .6rem;
+        }
+
+        /* Edit overlay */
+        .edit-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(58,46,40,.88);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: .6rem;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity .3s;
+        }
+
+        .img-card:hover .edit-overlay {
+            opacity: 1;
+        }
+
+        .edit-overlay input, .edit-overlay select {
+            width: 100%;
+            padding: .4rem .6rem;
+            font-size: .75rem;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            background: rgba(255,255,255,.9);
+            color: var(--ink);
+        }
+
+        .overlay-btns {
+            display: flex;
+            gap: .4rem;
+            width: 100%;
+        }
+
+            .overlay-btns button {
+                flex: 1;
+                padding: .4rem;
+                font-size: .68rem;
+                letter-spacing: .1em;
+                text-transform: uppercase;
+                border: none;
+                cursor: pointer;
+                font-family: 'DM Sans', sans-serif;
+                transition: background .2s;
+            }
+
+        .save-btn {
+            background: var(--success);
+            color: #fff;
+        }
+
+            .save-btn:hover {
+                background: #5d8260;
+            }
+
+        .del-btn {
+            background: var(--error);
+            color: #fff;
+        }
+
+            .del-btn:hover {
+                background: #a85550;
+            }
+
+        .empty-state {
+            grid-column: 1/-1;
+            text-align: center;
+            padding: 3rem;
+            color: var(--taupe);
+            font-size: .85rem;
+            letter-spacing: .1em;
+        }
+
+        .loading-state {
+            grid-column: 1/-1;
+            text-align: center;
+            padding: 2rem;
+            color: var(--taupe);
+            font-size: .8rem;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+        }
+
+        @media(max-width:900px) {
+            .dashboard-body {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast"></div>
+
+    <!-- ── LOGIN ── -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>Lionessta</h1>
+            <p>Admin access only</p>
+            <div class="field">
+                <label>Username</label>
+                <input type="text" id="username" placeholder="admin" autocomplete="username" />
+            </div>
+            <div class="field">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="••••••••" autocomplete="current-password"
+                       onkeydown="if(event.key==='Enter') doLogin()" />
+            </div>
+            <button class="btn" onclick="doLogin()" id="login-btn">Sign In</button>
+        </div>
+    </div>
+
+    <!-- ── DASHBOARD ── -->
+    <div id="dashboard">
+
+        <div class="topbar">
+            <span class="topbar-brand">Lionessta Admin</span>
+            <div class="topbar-right">
+                <span id="admin-name"></span>
+                <button class="logout-btn" onclick="doLogout()">Sign out</button>
+            </div>
+        </div>
+
+        <div class="dashboard-body">
+
+            <!-- LEFT: Upload form -->
+            <div class="card">
+                <h2>Upload New Image</h2>
+
+                <div class="drop-zone" id="drop-zone">
+                    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp"
+                           onchange="handleFileSelect(this.files[0])" />
+                    <div class="drop-zone-icon">📁</div>
+                    <p><strong>Click to browse</strong> or drag & drop</p>
+                    <p style="margin-top:.3rem;font-size:.72rem">JPEG, PNG, WebP · Max 10MB</p>
+                </div>
+
+                <div id="preview-wrap">
+                    <img id="preview-img" src="" alt="Preview" />
+                    <button class="remove-preview" onclick="clearFile()">✕</button>
+                </div>
+
+                <div class="field">
+                    <label>Label</label>
+                    <input type="text" id="upload-label" placeholder="e.g. Black Crochet Bag" />
+                </div>
+
+                <div class="field">
+                    <label>Category</label>
+                    <select id="upload-category">
+                        <option value="bags">Bags</option>
+                        <option value="accessories">Accessories</option>
+                        <option value="home">Home</option>
+                    </select>
+                </div>
+
+                <button class="btn" id="upload-btn" onclick="doUpload()">Upload Image</button>
+            </div>
+
+            <!-- RIGHT: Image management -->
+            <div>
+                <div class="images-header">
+                    <h2>All Images</h2>
+                    <span id="img-count">0 images</span>
+                </div>
+
+                <div class="filter-bar">
+                    <button class="ftab active" onclick="filterAdmin('all',this)">All</button>
+                    <button class="ftab" onclick="filterAdmin('bags',this)">Bags</button>
+                    <button class="ftab" onclick="filterAdmin('accessories',this)">Accessories</button>
+                    <button class="ftab" onclick="filterAdmin('home',this)">Home</button>
+                </div>
+
+                <div class="img-grid" id="img-grid">
+                    <div class="loading-state">Loading...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+  const API = ''; // same origin — change to your deployed URL if needed
+
+  let token = localStorage.getItem('lion_token') || '';
+  let selectedFile = null;
+  let allImages = [];
+
+  // ── TOAST
+  function toast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    setTimeout(() => t.className = '', 3000);
+  }
+
+  // ── AUTH CHECK ON LOAD
+  window.addEventListener('load', () => {
+    if (token) showDashboard();
+  });
+
+  // ── LOGIN
+  async function doLogin() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if (!username || !password) { toast('Enter username and password', 'error'); return; }
+
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Signing in...';
+
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!res.ok) throw new Error('Invalid credentials');
+
+      const data = await res.json();
+      token = data.token;
+      localStorage.setItem('lion_token', token);
+      document.getElementById('admin-name').textContent = username;
+      showDashboard();
+
+    } catch (err) {
+      toast(err.message || 'Login failed', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  function doLogout() {
+    token = '';
+    localStorage.removeItem('lion_token');
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  function showDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadImages();
+  }
+
+  // ── FILE HANDLING
+  function handleFileSelect(file) {
+    if (!file) return;
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('preview-img').src = e.target.result;
+      document.getElementById('preview-wrap').style.display = 'block';
+      document.getElementById('drop-zone').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('preview-wrap').style.display = 'none';
+    document.getElementById('drop-zone').style.display = 'block';
+  }
+
+  // Drag and drop
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  });
+
+  // ── UPLOAD
+  async function doUpload() {
+    const label    = document.getElementById('upload-label').value.trim();
+    const category = document.getElementById('upload-category').value;
+
+    if (!selectedFile) { toast('Please select an image', 'error'); return; }
+    if (!label)        { toast('Please enter a label', 'error'); return; }
+
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true; btn.textContent = 'Uploading...';
+
+    try {
+      const form = new FormData();
+      form.append('File', selectedFile);
+      form.append('Label', label);
+      form.append('Category', category);
+
+      const res = await fetch(`${API}/api/images/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: form
+      });
+
+      if (res.status === 401) { toast('Session expired — please log in again', 'error'); doLogout(); return; }
+      if (!res.ok) throw new Error('Upload failed');
+
+      toast('Image uploaded successfully');
+      clearFile();
+      document.getElementById('upload-label').value = '';
+      loadImages();
+
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Upload Image';
+    }
+  }
+
+  // ── LOAD IMAGES
+  async function loadImages(cat = 'all') {
+    const grid = document.getElementById('img-grid');
+    grid.innerHTML = '<div class="loading-state">Loading...</div>';
+
+    try {
+      const url = cat === 'all' ? `${API}/api/images` : `${API}/api/images?category=${cat}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+
+      allImages = await res.json();
+      document.getElementById('img-count').textContent = `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+      renderGrid(allImages);
+
+    } catch {
+      grid.innerHTML = '<div class="empty-state">Could not load images.</div>';
+    }
+  }
+
+  function renderGrid(images) {
+    const grid = document.getElementById('img-grid');
+    if (images.length === 0) {
+      grid.innerHTML = '<div class="empty-state">No images yet. Upload your first one!</div>';
+      return;
+    }
+
+    grid.innerHTML = images.map(img => `
+      <div class="img-card" id="card-${img.id}">
+        <img src="${img.imageUrl}" alt="${img.label}"/>
+        <div class="edit-overlay">
+          <input type="text" id="lbl-${img.id}" value="${img.label}" placeholder="Label"/>
+          <select id="cat-${img.id}">
+            <option value="bags"         ${img.category==='bags'?'selected':''}>Bags</option>
+            <option value="accessories"  ${img.category==='accessories'?'selected':''}>Accessories</option>
+            <option value="home"         ${img.category==='home'?'selected':''}>Home</option>
+          </select>
+          <div class="overlay-btns">
+            <button class="save-btn" onclick="doUpdate(${img.id})">Save</button>
+            <button class="del-btn"  onclick="doDelete(${img.id})">Delete</button>
+          </div>
+        </div>
+        <div class="img-card-info">
+          <strong>${img.label}</strong>
+          <span>${img.category}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── UPDATE
+  async function doUpdate(id) {
+    const label    = document.getElementById(`lbl-${id}`).value.trim();
+    const category = document.getElementById(`cat-${id}`).value;
+
+    try {
+      const res = await fetch(`${API}/api/images/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ label, category })
+      });
+
+      if (!res.ok) throw new Error();
+      toast('Updated successfully');
+      loadImages();
+
+    } catch {
+      toast('Update failed', 'error');
+    }
+  }
+
+  // ── DELETE
+  async function doDelete(id) {
+    if (!confirm('Delete this image? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`${API}/api/images/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error();
+      toast('Image deleted');
+      loadImages();
+
+    } catch {
+      toast('Delete failed', 'error');
+    }
+  }
+
+  // ── FILTER
+  function filterAdmin(cat, btn) {
+    document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadImages(cat);
+  }
+    </script>
+</body>
+</html>
