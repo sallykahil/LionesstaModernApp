@@ -41,6 +41,15 @@ builder.Services.AddCors();
 
 var app = builder.Build();
 
+// Apply any pending EF Core migrations on startup. This is what keeps the
+// deployed database schema in sync automatically -- without it, a migration
+// added locally (e.g. new Categories table) never reaches Azure SQL unless
+// someone remembers to run `dotnet ef database update` against it by hand.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

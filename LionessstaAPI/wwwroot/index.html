@@ -502,6 +502,17 @@
       }
     }
 
+    function updateGazeFromPoint(clientX, clientY) {
+      const rect = img.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      const dx = clientX - cx, dy = clientY - cy;
+      let gaze = 'center';
+      if (Math.abs(dx) > DEADZONE || Math.abs(dy) > DEADZONE) {
+        gaze = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      }
+      setGaze(gaze);
+    }
+
     window.addEventListener('mousemove', (e) => {
       const rect = img.getBoundingClientRect();
       const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
@@ -513,12 +524,21 @@
       img.style.transform = within ? `translate3d(${dx / strength}px, ${dy / strength}px, 0)` : 'translate3d(0,0,0)';
 
       // Gaze direction -- reacts to the cursor anywhere on the page.
-      let gaze = 'center';
-      if (Math.abs(dx) > DEADZONE || Math.abs(dy) > DEADZONE) {
-        gaze = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-      }
-      setGaze(gaze);
+      updateGazeFromPoint(e.clientX, e.clientY);
     }, { passive: true });
+
+    // Touch devices have no cursor, so mousemove never fires there -- instead,
+    // dragging a finger across her portrait itself steers her gaze the same way.
+    // Scoped to the portrait wrapper (not the whole page) so normal page
+    // scrolling elsewhere is untouched.
+    function handlePortraitTouch(e) {
+      const touch = e.touches[0];
+      if (!touch) return;
+      updateGazeFromPoint(touch.clientX, touch.clientY);
+    }
+    const portraitWrap = document.getElementById('heroPortraitWrap');
+    portraitWrap.addEventListener('touchstart', handlePortraitTouch, { passive: true });
+    portraitWrap.addEventListener('touchmove', handlePortraitTouch, { passive: true });
 
     /* ── PRESS ENTER: throw a yarn ball, always from the center pose ── */
     function throwYarn() {
