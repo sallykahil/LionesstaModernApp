@@ -446,6 +446,18 @@
   const WHATSAPP = '+96176690914'; // ← replace with your WhatsApp number (no + or spaces)
   const PREVIEW_COUNT = 3;
 
+  // ?v=2 cache-busts these -- bump it again if the images are ever replaced in place,
+  // since browsers cache image URLs aggressively and a same-path overwrite can stick.
+  // Shared (not just for the hero gaze effect below) -- also used as the branded
+  // fallback imagery anywhere real product photos aren't available yet.
+  const GAZE_SRC = {
+    center: '/images/hero-center.png?v=4',
+    up: '/images/hero-up.png?v=3',
+    down: '/images/hero-down.png?v=3',
+    left: '/images/hero-left.png?v=3',
+    right: '/images/hero-right.png?v=3',
+  };
+
   let allProducts = [];
   let allCategories = [];
   let cart = JSON.parse(sessionStorage.getItem('lion_cart') || '[]');
@@ -477,15 +489,6 @@
     const padding = 150, strength = 12;
     const DEADZONE = 60; // px of cursor movement from portrait center before it looks away from "center"
 
-    // ?v=2 cache-busts these -- bump it again if the images are ever replaced in place,
-    // since browsers cache image URLs aggressively and a same-path overwrite can stick.
-    const GAZE_SRC = {
-      center: '/images/hero-center.png?v=4',
-      up: '/images/hero-up.png?v=3',
-      down: '/images/hero-down.png?v=3',
-      left: '/images/hero-left.png?v=3',
-      right: '/images/hero-right.png?v=3',
-    };
     const gazeLoaded = {};
     Object.entries(GAZE_SRC).forEach(([dir, src]) => {
       const preload = new Image();
@@ -643,7 +646,7 @@
 
     grid.innerHTML = usedCats.map(cat => {
       const products = allProducts.filter(p => p.categoryId === cat.id);
-      const cover = products[0] ? products[0].imageUrl : `https://picsum.photos/seed/cat-${cat.id}/400/300`;
+      const cover = products[0] ? products[0].imageUrl : GAZE_SRC.center;
       return `
       <button class="category-tile" onclick="scrollToCategory(${cat.id})">
         <img src="${cover}" alt="${cat.name}" loading="lazy" />
@@ -686,8 +689,10 @@
 
   /* ── MARQUEE ── */
   function renderMarquee() {
+    // No random stock photos here -- if products haven't loaded (or there are
+    // none yet), fall back to her own portraits rather than unrelated filler.
     const images = allProducts.length ? allProducts.map(p => p.imageUrl) :
-      Array.from({ length: 10 }, (_, i) => `https://picsum.photos/seed/lionessta-marquee-${i}/300/200`);
+      Object.values(GAZE_SRC);
     const row1 = images.slice(0, Math.ceil(images.length / 2));
     const row2 = images.slice(Math.ceil(images.length / 2));
     const triple = (arr) => [...arr, ...arr, ...arr];
