@@ -1,8 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace LionessstaAPI.DTOs
 {
-    // Received from the admin panel when uploading a new image
+    // Received from the admin panel when uploading a new product
     // Sent as multipart/form-data (because it contains a file)
     public class ImageUploadDto
     {
@@ -14,7 +14,13 @@ namespace LionessstaAPI.DTOs
         public string Label { get; set; } = string.Empty;
 
         [Required]
-        [MaxLength(50)]
-        public string Category { get; set; } = string.Empty; // "bags" | "accessories" | "home"
+        public int CategoryId { get; set; }
+
+        [Required]
+        [Range(0, 100000)]
+        public decimal Price { get; set; }
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
     }
 }

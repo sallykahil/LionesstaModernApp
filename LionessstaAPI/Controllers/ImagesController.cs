@@ -1,4 +1,4 @@
-﻿using LionessstaAPI.Data;
+using LionessstaAPI.Data;
 using LionessstaAPI.DTOs;
 using LionessstaAPI.Models;
 using LionessstaAPI.Services;
@@ -14,35 +14,46 @@ namespace LionessstaAPI.Controllers
     {
         private readonly AppDbContext _db;
         private readonly IBlobService _blobService;
+        private readonly ILogger<ImagesController> _logger;
 
-        public ImagesController(AppDbContext db, IBlobService blobService)
+        public ImagesController(AppDbContext db, IBlobService blobService, ILogger<ImagesController> logger)
         {
             _db = db;
             _blobService = blobService;
+            _logger = logger;
         }
 
+        private static ImageResponseDto ToDto(ProductImage img) => new()
+        {
+            Id = img.Id,
+            Label = img.Label,
+            Price = img.Price,
+            Description = img.Description,
+            CategoryId = img.CategoryId,
+            CategoryName = img.Category?.Name ?? string.Empty,
+            CategorySlug = img.Category?.Slug ?? string.Empty,
+            ImageUrl = img.ImageUrl,
+            CreatedAt = img.CreatedAt
+        };
+
         // GET /api/images
-        // GET /api/images?category=bags
-        // Public — called by your frontend gallery on page load
+        // GET /api/images?categorySlug=bags
+        // GET /api/images?categoryId=3
+        // Public — called by the storefront on page load
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll([FromQuery] string? category)
+        public async Task<IActionResult> GetAll([FromQuery] string? categorySlug, [FromQuery] int? categoryId)
         {
-            var query = _db.ProductImages.AsQueryable();
+            var query = _db.ProductImages.Include(img => img.Category).AsQueryable();
 
-            if (!string.IsNullOrEmpty(category))
-                query = query.Where(img => img.Category.ToLower() == category.ToLower());
+            if (categoryId.HasValue)
+                query = query.Where(img => img.CategoryId == categoryId.Value);
+            else if (!string.IsNullOrEmpty(categorySlug))
+                query = query.Where(img => img.Category!.Slug.ToLower() == categorySlug.ToLower());
 
             var images = await query
                 .OrderByDescending(img => img.CreatedAt)
-                .Select(img => new ImageResponseDto
-                {
-                    Id = img.Id,
-                    Label = img.Label,
-                    Category = img.Category,
-                    ImageUrl = img.ImageUrl,
-                    CreatedAt = img.CreatedAt
-                })
+                .Select(img => ToDto(img))
                 .ToListAsync();
 
             return Ok(images);
@@ -54,26 +65,20 @@ namespace LionessstaAPI.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetById(int id)
         {
-            var image = await _db.ProductImages.FindAsync(id);
+            var image = await _db.ProductImages.Include(img => img.Category)
+                .FirstOrDefaultAsync(img => img.Id == id);
 
             if (image == null)
                 return NotFound(new { message = $"Image {id} not found." });
 
-            return Ok(new ImageResponseDto
-            {
-                Id = image.Id,
-                Label = image.Label,
-                Category = image.Category,
-                ImageUrl = image.ImageUrl,
-                CreatedAt = image.CreatedAt
-            });
+            return Ok(ToDto(image));
         }
 
         // POST /api/images/upload
-        // Admin only — receives file + label + category
+        // Admin only — receives file + label + categoryId + price + description
         // Resizes image → uploads to Azure → saves URL in DB
         [HttpPost("upload")]
-        //[Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Upload([FromForm] ImageUploadDto dto)
         {
             if (dto.File == null || dto.File.Length == 0)
@@ -85,6 +90,10 @@ namespace LionessstaAPI.Controllers
 
             if (dto.File.Length > 10 * 1024 * 1024)
                 return BadRequest(new { message = "Max file size is 10MB." });
+
+            var category = await _db.Categories.FindAsync(dto.CategoryId);
+            if (category == null)
+                return BadRequest(new { message = $"Category {dto.CategoryId} does not exist." });
 
             try
             {
@@ -100,7 +109,9 @@ namespace LionessstaAPI.Controllers
                 var image = new ProductImage
                 {
                     Label = dto.Label,
-                    Category = dto.Category.ToLower(),
+                    CategoryId = dto.CategoryId,
+                    Price = dto.Price,
+                    Description = dto.Description,
                     ImageUrl = imageUrl,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -108,30 +119,21 @@ namespace LionessstaAPI.Controllers
                 _db.ProductImages.Add(image);
                 await _db.SaveChangesAsync();
 
-                return CreatedAtAction(nameof(GetById), new { id = image.Id }, new ImageResponseDto
-                {
-                    Id = image.Id,
-                    Label = image.Label,
-                    Category = image.Category,
-                    ImageUrl = image.ImageUrl,
-                    CreatedAt = image.CreatedAt
-                });
+                image.Category = category;
+
+                return CreatedAtAction(nameof(GetById), new { id = image.Id }, ToDto(image));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new
-                {
-                    message = ex.Message,           // real error
-                    inner = ex.InnerException?.Message,  // inner error if any
-                    stack = ex.StackTrace         // exact line that failed
-                });
+                _logger.LogError(ex, "Upload failed for file {FileName}", dto.File.FileName);
+                return StatusCode(500, new { message = "Upload failed. Please try again." });
             }
         }
 
         // PUT /api/images/5
-        // Admin only — edit label and/or category, does NOT re-upload the image
+        // Admin only — edit label, category, price, and/or description, does NOT re-upload the image
         [HttpPut("{id}")]
-        //[Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] ImageUpdateDto dto)
         {
             var image = await _db.ProductImages.FindAsync(id);
@@ -142,8 +144,20 @@ namespace LionessstaAPI.Controllers
             if (!string.IsNullOrEmpty(dto.Label))
                 image.Label = dto.Label;
 
-            if (!string.IsNullOrEmpty(dto.Category))
-                image.Category = dto.Category.ToLower();
+            if (dto.CategoryId.HasValue)
+            {
+                var categoryExists = await _db.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value);
+                if (!categoryExists)
+                    return BadRequest(new { message = $"Category {dto.CategoryId} does not exist." });
+
+                image.CategoryId = dto.CategoryId.Value;
+            }
+
+            if (dto.Price.HasValue)
+                image.Price = dto.Price.Value;
+
+            if (dto.Description != null)
+                image.Description = dto.Description;
 
             await _db.SaveChangesAsync();
 
@@ -153,7 +167,7 @@ namespace LionessstaAPI.Controllers
         // DELETE /api/images/5
         // Admin only — deletes from Azure Blob AND from the database
         [HttpDelete("{id}")]
-        //[Authorize]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var image = await _db.ProductImages.FindAsync(id);
