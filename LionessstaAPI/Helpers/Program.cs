@@ -59,7 +59,15 @@ var app = builder.Build();
 try
 {
     using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    // Migrate() must run through the execution strategy when EnableRetryOnFailure
+    // is configured -- calling it directly throws "the configured execution
+    // strategy does not support user-initiated transactions", because Migrate()
+    // wraps each migration in its own transaction and the retry wrapper needs to
+    // own that transaction to retry it safely as a whole unit.
+    var strategy = db.Database.CreateExecutionStrategy();
+    strategy.Execute(() => db.Database.Migrate());
 }
 catch (Exception ex)
 {
