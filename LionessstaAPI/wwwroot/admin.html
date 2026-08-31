@@ -591,6 +591,16 @@
     if (options.auth) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${API}${path}`, { ...options, headers });
     if (!res.ok) {
+      // A 401 on an authenticated call means the stored token expired (login
+      // tokens last 8h) or is otherwise no longer valid -- the dashboard trusts
+      // whatever token is in localStorage without checking it on load, so this
+      // is the only point where we find out. Force a clean re-login instead of
+      // surfacing a confusing raw "Request failed (401)" on every write action.
+      if (res.status === 401 && options.auth) {
+        doLogout();
+        toast('Your session expired -- please sign in again.', 'error');
+        throw new Error('Session expired. Please sign in again.');
+      }
       let message = `Request failed (${res.status}).`;
       try { const body = await res.json(); if (body?.message) message = body.message; } catch {}
       throw new Error(message);
@@ -633,6 +643,10 @@
     localStorage.removeItem('lion_token');
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    // Modals live outside #dashboard in the DOM, so hiding the dashboard alone
+    // leaves one stranded on top of the login screen if a session expires
+    // while it's open (e.g. the 401 handler above calling this mid-request).
+    document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
   }
 
   function showDashboard() {
