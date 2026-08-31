@@ -125,8 +125,12 @@
 
   .hero-portrait-wrap {
     position: relative; flex: 1 1 300px; min-width: 240px; max-width: 420px;
-    display: flex; align-items: flex-end; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: .4rem;
     opacity: 0; animation: fade-in 1s ease .3s forwards;
+  }
+  .hero-portrait-title {
+    font-size: clamp(1.5rem, 3.2vw, 2.2rem); font-weight: 900; text-transform: uppercase;
+    letter-spacing: .06em; text-align: center;
   }
   .hero-portrait-wrap img { width: 100%; max-width: 360px; height: auto; max-height: 58vh; object-fit: contain; filter: drop-shadow(0 20px 30px rgba(58,36,22,.25)); will-change: transform; transition: transform .6s cubic-bezier(.22,1,.36,1); }
 
@@ -339,6 +343,7 @@
     </div>
 
     <div class="hero-portrait-wrap" id="heroPortraitWrap">
+      <p class="hero-portrait-title hero-heading">Lionessta</p>
       <div class="portrait-throw-anchor" id="portraitThrowAnchor">
         <img id="heroPortrait" src="/images/hero-center.png?v=4" alt="Lionessta, handmade crochet maker" />
       </div>
