@@ -36,8 +36,6 @@
 
   @keyframes fade-up { 0% { opacity: 0; transform: translateY(28px); } 100% { opacity: 1; transform: translateY(0); } }
   @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
-  @keyframes marquee-right { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }
-  @keyframes marquee-left  { 0% { transform: translateX(-33.333%); } 100% { transform: translateX(0); } }
   @keyframes shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
   @keyframes bounce-cue { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,6px); } }
 
@@ -169,10 +167,31 @@
   /* ════════════════════════════════
      MARQUEE
   ════════════════════════════════ */
-  .marquee-section { background: var(--bg); padding: clamp(3rem,8vw,6rem) 0 1.5rem; overflow: hidden; }
-  .marquee-row { display: flex; gap: 12px; will-change: transform; }
-  .marquee-row + .marquee-row { margin-top: 12px; }
-  .marquee-row img { width: 300px; height: 200px; object-fit: cover; border-radius: 18px; flex-shrink: 0; background: var(--surface); }
+  /* ── PRODUCT CAROUSEL (horizontal coverflow) ── */
+  .carousel-section { background: var(--bg); padding: clamp(3rem,8vw,6rem) 5% clamp(2.5rem,5vw,4rem); overflow: hidden; }
+  .carousel-viewport { position: relative; height: clamp(300px, 42vw, 400px); max-width: 1100px; margin: 0 auto; perspective: 1400px; touch-action: pan-y; }
+  .carousel-stage { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .carousel-card {
+    position: absolute; top: 50%; left: 50%; width: clamp(150px, 20vw, 230px);
+    transform-style: preserve-3d; will-change: transform, opacity; cursor: pointer;
+  }
+  .carousel-card-inner {
+    border-radius: 18px; border: 2px solid var(--border-strong); background: var(--bg);
+    box-shadow: 0 20px 40px rgba(58,36,22,.22); overflow: hidden; display: flex; flex-direction: column;
+  }
+  .carousel-card img { width: 100%; aspect-ratio: 4/5; object-fit: cover; display: block; background: var(--surface); }
+  .carousel-card-body { padding: 10px 12px 12px; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .carousel-card-name { font-weight: 600; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .carousel-card-price { font-weight: 800; font-size: .85rem; color: var(--accent); flex-shrink: 0; }
+  .carousel-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); display: flex;
+    align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; z-index: 500; transition: background .2s;
+  }
+  .carousel-arrow:hover { background: var(--surface); }
+  .carousel-arrow-left { left: 0; }
+  .carousel-arrow-right { right: 0; }
+  @media (max-width: 640px) { .carousel-arrow { width: 36px; height: 36px; font-size: .95rem; } }
 
   /* ════════════════════════════════
      ABOUT
@@ -353,10 +372,14 @@
   <div class="scroll-cue"><span class="line"></span>Scroll</div>
 </section>
 
-<!-- ════ MARQUEE ════ -->
-<section class="marquee-section">
-  <div class="marquee-row" id="marqueeRow1"></div>
-  <div class="marquee-row" id="marqueeRow2"></div>
+<!-- ════ PRODUCT CAROUSEL ════ -->
+<section class="carousel-section">
+  <h2 class="shop-heading hero-heading" style="font-size: clamp(2.2rem, 7vw, 5rem); margin-bottom: clamp(1.5rem, 3vw, 2.2rem); text-align: center;">Fresh From The Hook</h2>
+  <div class="carousel-viewport" id="carouselViewport">
+    <button type="button" class="carousel-arrow carousel-arrow-left" aria-label="Previous product" onclick="carouselStep(-1)">&#8592;</button>
+    <div class="carousel-stage" id="carouselStage"></div>
+    <button type="button" class="carousel-arrow carousel-arrow-right" aria-label="Next product" onclick="carouselStep(1)">&#8594;</button>
+  </div>
 </section>
 
 <!-- ════ ABOUT ════ -->
@@ -600,7 +623,7 @@
     } catch {
       allCategories = []; allProducts = [];
     }
-    renderMarquee();
+    renderCarousel();
     renderShop();
     renderCategoriesGrid();
     renderCategoriesDropdown();
@@ -692,30 +715,124 @@
     renderAllProducts();
   }
 
-  /* ── MARQUEE ── */
-  function renderMarquee() {
+  /* ── PRODUCT CAROUSEL (horizontal coverflow, replaces the old scrolling marquee) ── */
+  let carouselItems = [];
+  let carouselProgress = 0;
+  let carouselTarget = 0;
+  let carouselFrame = 0;
+  let carouselDragStartX = null;
+
+  function renderCarousel() {
+    const stage = document.getElementById('carouselStage');
     // No random stock photos here -- if products haven't loaded (or there are
     // none yet), fall back to her own portraits rather than unrelated filler.
-    const images = allProducts.length ? allProducts.map(p => p.imageUrl) :
-      Object.values(GAZE_SRC);
-    const row1 = images.slice(0, Math.ceil(images.length / 2));
-    const row2 = images.slice(Math.ceil(images.length / 2));
-    const triple = (arr) => [...arr, ...arr, ...arr];
+    carouselItems = allProducts.length ? allProducts :
+      Object.values(GAZE_SRC).map(src => ({ id: null, imageUrl: src, label: 'Lionessta', price: null, categoryName: '' }));
 
-    const build = (arr) => triple(arr).map(src => `<img src="${src}" alt="" loading="lazy" />`).join('');
-    document.getElementById('marqueeRow1').innerHTML = build(row1.length ? row1 : images);
-    document.getElementById('marqueeRow2').innerHTML = build(row2.length ? row2 : images);
+    stage.innerHTML = carouselItems.map((p, i) => {
+      const clickable = p.id != null;
+      const inCart = clickable && cart.some(c => c.id === p.id);
+      const safeUrl = p.imageUrl.replace(/'/g, "\\'");
+      const safeLabel = (p.label || '').replace(/'/g, "\\'");
+      const safeCat = (p.categoryName || '').replace(/'/g, "\\'");
+      const imgClick = clickable
+        ? `event.stopPropagation(); openLightbox('${safeUrl}','${safeLabel}','${safeCat}',${p.price})`
+        : '';
+      return `
+      <div class="carousel-card" data-index="${i}" onclick="carouselCardClick(event, ${i})">
+        <div class="carousel-card-inner">
+          <img src="${p.imageUrl}" alt="${p.label || ''}" loading="lazy" onclick="${imgClick}" />
+          ${clickable ? `
+          <div class="carousel-card-body">
+            <span class="carousel-card-name">${p.label}</span>
+            <span class="carousel-card-price">${formatPrice(p.price)}</span>
+            <button class="add-to-cart-btn ${inCart ? 'added' : ''}" data-atc="${p.id}" aria-label="${inCart ? 'Added to cart' : 'Add to cart'}" onclick="event.stopPropagation(); toggleCart(${p.id})">
+              ${inCart ? CHECK_ICON : CART_ICON}
+            </button>
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
 
-    let offset = 0;
-    const r1 = document.getElementById('marqueeRow1');
-    const r2 = document.getElementById('marqueeRow2');
-    function onScroll() {
-      offset = window.scrollY * 0.25;
-      r1.style.transform = `translateX(${-offset}px)`;
-      r2.style.transform = `translateX(${offset - 400}px)`;
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    cancelAnimationFrame(carouselFrame);
+    const tick = () => {
+      carouselTick();
+      carouselFrame = requestAnimationFrame(tick);
+    };
+    carouselFrame = requestAnimationFrame(tick);
+
+    const viewport = document.getElementById('carouselViewport');
+    viewport.ontouchstart = (e) => { carouselDragStartX = e.touches[0].clientX; };
+    viewport.ontouchend = (e) => {
+      if (carouselDragStartX == null) return;
+      const dx = e.changedTouches[0].clientX - carouselDragStartX;
+      if (Math.abs(dx) > 40) carouselStep(dx > 0 ? -1 : 1);
+      carouselDragStartX = null;
+    };
+  }
+
+  function carouselStep(dir) {
+    carouselTarget += dir;
+  }
+
+  function carouselCardClick(e, index) {
+    // Clicking a peeking side card snaps it straight to center instead of
+    // only ever stepping by one -- feels more like browsing than a slideshow.
+    const offset = parseFloat(e.currentTarget.dataset.offset || '0');
+    carouselTarget = carouselProgress + offset;
+  }
+
+  function carouselTick() {
+    carouselProgress += (carouselTarget - carouselProgress) * 0.12;
+    const cards = document.querySelectorAll('#carouselStage .carousel-card');
+    const count = cards.length;
+    if (!count) return;
+    const cardW = cards[0].offsetWidth;
+    const rounded = Math.round(carouselProgress);
+    const diff = carouselProgress - rounded;
+    // Same "magnetic dwell" easing as the card-carousel template this was ported from.
+    const eased = Math.sign(diff) * Math.pow(Math.abs(diff) * 2, 4.2) / 2;
+    const virtualActive = rounded + eased;
+    const half = count / 2;
+    const gap = 22;
+
+    cards.forEach((card) => {
+      const i = parseInt(card.dataset.index, 10);
+      let offset = i - virtualActive;
+      while (offset > half) offset -= count;
+      while (offset < -half) offset += count;
+      card.dataset.offset = offset.toFixed(4);
+      const abs = Math.abs(offset);
+      const sign = Math.sign(offset);
+
+      if (abs > 3.2) {
+        card.style.opacity = '0';
+        card.style.pointerEvents = 'none';
+        return;
+      }
+      let x, z, rot, opacity;
+      if (abs <= 1) {
+        const t = abs;
+        const e = t * t * (3 - 2 * t);
+        x = -sign * e * (cardW + gap);
+        z = -e * 130;
+        rot = e * 46; // capped well under 90deg so we never need a card back-face
+        opacity = 1;
+      } else {
+        const t = Math.min((abs - 1) / 1.6, 1);
+        const e = t * t * (3 - 2 * t);
+        const xStart = cardW + gap;
+        const xEnd = cardW * 1.9 + gap;
+        x = -sign * (xStart + e * (xEnd - xStart));
+        z = -130 - e * 160;
+        rot = 46 + e * 26;
+        opacity = 1 - e; // fade out as it nears the edge
+      }
+      card.style.zIndex = String(2000 - Math.round(abs * 100));
+      card.style.opacity = Math.max(0, opacity).toFixed(3);
+      card.style.pointerEvents = abs < 2.4 ? 'auto' : 'none';
+      card.style.transform = `translate(-50%, -50%) translateX(${x.toFixed(2)}px) translateZ(${z.toFixed(2)}px) rotateY(${(-sign * rot).toFixed(2)}deg)`;
+    });
   }
 
   /* ── SHOP: category blocks + show-more modal ── */
