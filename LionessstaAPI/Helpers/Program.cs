@@ -21,6 +21,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IBlobService, BlobService>();
 builder.Services.AddScoped<JwtHelper>();
 
+// Products/categories change roughly once a day, but every visitor's page
+// load reads them -- caching the list endpoints in memory means only the
+// first request after a cache miss touches SQL; everyone else gets an
+// instant in-process response. Controllers invalidate these entries the
+// moment something is actually created/updated/deleted.
+builder.Services.AddMemoryCache();
+
 // ── JWT AUTHENTICATION
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

@@ -4,6 +4,7 @@ using LionessstaAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LionessstaAPI.Controllers
 {
@@ -13,11 +14,19 @@ namespace LionessstaAPI.Controllers
     {
         private readonly AppDbContext _db;
         private readonly ILogger<CategoriesController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public CategoriesController(AppDbContext db, ILogger<CategoriesController> logger)
+        // Category renames/deletes affect the CategoryName/Slug embedded in
+        // every cached image DTO too, so both cache keys are cleared together.
+        private const string CategoriesCacheKey = "categories:all";
+        private const string ImagesCacheKey = "images:all";
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(24);
+
+        public CategoriesController(AppDbContext db, ILogger<CategoriesController> logger, IMemoryCache cache)
         {
             _db = db;
             _logger = logger;
+            _cache = cache;
         }
 
         private static CategoryResponseDto ToDto(Category c, int productCount) => new()
@@ -36,12 +45,19 @@ namespace LionessstaAPI.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
-            var categories = await _db.Categories
-                .OrderBy(c => c.Name)
-                .Select(c => new { Category = c, ProductCount = c.Products.Count })
-                .ToListAsync();
+            var result = await _cache.GetOrCreateAsync(CategoriesCacheKey, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
-            return Ok(categories.Select(x => ToDto(x.Category, x.ProductCount)));
+                var categories = await _db.Categories
+                    .OrderBy(c => c.Name)
+                    .Select(c => new { Category = c, ProductCount = c.Products.Count })
+                    .ToListAsync();
+
+                return categories.Select(x => ToDto(x.Category, x.ProductCount)).ToList();
+            });
+
+            return Ok(result);
         }
 
         // GET /api/categories/5
@@ -81,6 +97,7 @@ namespace LionessstaAPI.Controllers
 
             _db.Categories.Add(category);
             await _db.SaveChangesAsync();
+            _cache.Remove(CategoriesCacheKey);
 
             return CreatedAtAction(nameof(GetById), new { id = category.Id }, ToDto(category, 0));
         }
@@ -113,6 +130,8 @@ namespace LionessstaAPI.Controllers
                 category.Description = dto.Description;
 
             await _db.SaveChangesAsync();
+            _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(ImagesCacheKey); // embedded CategoryName/Slug on cached images may now be stale
 
             return Ok(new { message = "Updated successfully." });
         }
@@ -136,6 +155,7 @@ namespace LionessstaAPI.Controllers
             {
                 _db.Categories.Remove(category);
                 await _db.SaveChangesAsync();
+                _cache.Remove(CategoriesCacheKey);
 
                 return Ok(new { message = "Deleted successfully." });
             }

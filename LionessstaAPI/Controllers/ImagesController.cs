@@ -5,6 +5,7 @@ using LionessstaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LionessstaAPI.Controllers
 {
@@ -15,12 +16,23 @@ namespace LionessstaAPI.Controllers
         private readonly AppDbContext _db;
         private readonly IBlobService _blobService;
         private readonly ILogger<ImagesController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public ImagesController(AppDbContext db, IBlobService blobService, ILogger<ImagesController> logger)
+        // Only the unfiltered list is cached -- it's the only shape the storefront
+        // and admin panel ever actually request (both fetch everything once and
+        // filter client-side), so filtered queries just bypass the cache.
+        private const string ImagesCacheKey = "images:all";
+        // Must match CategoriesController's key -- every product write here also
+        // shifts a category's ProductCount, which is embedded in that cached list.
+        private const string CategoriesCacheKey = "categories:all";
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(24);
+
+        public ImagesController(AppDbContext db, IBlobService blobService, ILogger<ImagesController> logger, IMemoryCache cache)
         {
             _db = db;
             _blobService = blobService;
             _logger = logger;
+            _cache = cache;
         }
 
         private static ImageResponseDto ToDto(ProductImage img) => new()
@@ -44,12 +56,28 @@ namespace LionessstaAPI.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetAll([FromQuery] string? categorySlug, [FromQuery] int? categoryId)
         {
+            var noFilter = !categoryId.HasValue && string.IsNullOrEmpty(categorySlug);
+
+            if (noFilter)
+            {
+                var cached = await _cache.GetOrCreateAsync(ImagesCacheKey, async entry =>
+                {
+                    entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+                    return await _db.ProductImages.Include(img => img.Category)
+                        .OrderByDescending(img => img.CreatedAt)
+                        .Select(img => ToDto(img))
+                        .ToListAsync();
+                });
+
+                return Ok(cached);
+            }
+
             var query = _db.ProductImages.Include(img => img.Category).AsQueryable();
 
             if (categoryId.HasValue)
                 query = query.Where(img => img.CategoryId == categoryId.Value);
-            else if (!string.IsNullOrEmpty(categorySlug))
-                query = query.Where(img => img.Category!.Slug.ToLower() == categorySlug.ToLower());
+            else
+                query = query.Where(img => img.Category!.Slug.ToLower() == categorySlug!.ToLower());
 
             var images = await query
                 .OrderByDescending(img => img.CreatedAt)
@@ -118,6 +146,8 @@ namespace LionessstaAPI.Controllers
 
                 _db.ProductImages.Add(image);
                 await _db.SaveChangesAsync();
+                _cache.Remove(ImagesCacheKey);
+                _cache.Remove(CategoriesCacheKey); // this category's ProductCount just changed
 
                 image.Category = category;
 
@@ -144,12 +174,14 @@ namespace LionessstaAPI.Controllers
             if (!string.IsNullOrEmpty(dto.Label))
                 image.Label = dto.Label;
 
+            var categoryChanged = false;
             if (dto.CategoryId.HasValue)
             {
                 var categoryExists = await _db.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value);
                 if (!categoryExists)
                     return BadRequest(new { message = $"Category {dto.CategoryId} does not exist." });
 
+                categoryChanged = image.CategoryId != dto.CategoryId.Value;
                 image.CategoryId = dto.CategoryId.Value;
             }
 
@@ -160,6 +192,8 @@ namespace LionessstaAPI.Controllers
                 image.Description = dto.Description;
 
             await _db.SaveChangesAsync();
+            _cache.Remove(ImagesCacheKey);
+            if (categoryChanged) _cache.Remove(CategoriesCacheKey); // product counts shifted between categories
 
             return Ok(new { message = "Updated successfully." });
         }
@@ -181,6 +215,8 @@ namespace LionessstaAPI.Controllers
 
                 _db.ProductImages.Remove(image);
                 await _db.SaveChangesAsync();
+                _cache.Remove(ImagesCacheKey);
+                _cache.Remove(CategoriesCacheKey); // that category's ProductCount just dropped by one
 
                 return Ok(new { message = "Deleted successfully." });
             }
