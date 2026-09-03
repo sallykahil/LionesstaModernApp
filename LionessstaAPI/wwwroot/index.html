@@ -1042,7 +1042,10 @@
   /* ── WHATSAPP CHECKOUT ── */
   function checkoutWhatsApp() {
     if (cart.length === 0) return;
-    const lines = cart.map(i => `• ${i.label} (${i.category}) — ${formatPrice(i.price)}`).join('\n');
+    // Product IDs are included because several products can share the same
+    // name (e.g. two listings both called "brown bag") -- without the ID the
+    // admin has no reliable way to tell exactly which one was ordered.
+    const lines = cart.map(i => `• ${i.label} (${i.category}) — ${formatPrice(i.price)} [ID: ${i.id}]`).join('\n');
     const msg = `Hi Lionessta! 👋\nI'd like to order:\n\n${lines}\n\nPlease let me know availability 🧶`;
     window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
   }
