@@ -199,6 +199,22 @@
   .about-section { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(2.5rem, 6vw, 4rem); padding: 5rem 1.5rem; text-align: center; }
   .about-heading { font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; line-height: .95; font-size: clamp(3rem, 12vw, 9rem); }
   .about-body { max-width: 560px; color: var(--text); font-weight: 500; line-height: 1.7; font-size: clamp(1rem, 2vw, 1.3rem); }
+  /* The source clip has a flat near-white background (not a real photographed
+     scene), so it's keyed out live in the browser -- see aboutVideoTick() below
+     -- instead of being pre-processed. No border/card here on purpose: the goal
+     is for her to look like she's standing directly on the page, background-free. */
+  .about-video-wrap { position: relative; width: 100%; max-width: 480px; aspect-ratio: 16/9; }
+  .about-video-poster, .about-video-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .about-video-canvas { display: none; }
+  .about-video-play {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 62px; height: 62px; border-radius: 50%; border: 2px solid var(--border-strong);
+    background: var(--bg); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 12px 28px rgba(58,36,22,.28); transition: transform .2s;
+  }
+  .about-video-play:hover { transform: translate(-50%, -50%) scale(1.07); }
+  .about-video-play svg { width: 20px; height: 20px; margin-left: 3px; }
+  .about-video-play[hidden] { display: none; }
 
   /* ════════════════════════════════
      CONTACT
@@ -400,6 +416,15 @@
 <!-- ════ ABOUT ════ -->
 <section class="about-section reveal" id="about">
   <h2 class="about-heading hero-heading">About Lionessta</h2>
+  <div class="about-video-wrap" id="aboutVideoWrap">
+    <img class="about-video-poster" id="aboutVideoPoster" src="/images/hero-center.webp" alt="" />
+    <canvas class="about-video-canvas" id="aboutVideoCanvas"></canvas>
+    <video id="aboutVideoSrc" src="/videos/lionessta-intro.mp4" playsinline preload="auto"
+      style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;"></video>
+    <button type="button" class="about-video-play" id="aboutVideoPlayBtn" onclick="playAboutIntro()" aria-label="Play introduction video">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+  </div>
   <p class="about-body">Every piece is crocheted by hand in Lebanon, one stitch at a time — no factories, no shortcuts, just yarn, patience, and heart. I love turning a single ball of yarn into something someone will cherish for years. Let's make something one-of-a-kind together!</p>
   <a href="#all-products" class="btn-pill">Shop Now</a>
 </section>
@@ -642,6 +667,55 @@
       throwYarn();
     });
   })();
+
+  /* ── ABOUT INTRO VIDEO (live in-browser background removal) ──
+     The source clip has a flat near-white background, so instead of needing a
+     separate video-editing tool we key it out ourselves: a hidden <video>
+     decodes the real file, and on every frame we copy it to a canvas and make
+     near-white pixels transparent, so she appears to float directly on the
+     page with no background at all. */
+  function playAboutIntro() {
+    const video = document.getElementById('aboutVideoSrc');
+    const canvas = document.getElementById('aboutVideoCanvas');
+    const poster = document.getElementById('aboutVideoPoster');
+    const btn = document.getElementById('aboutVideoPlayBtn');
+
+    poster.style.display = 'none';
+    canvas.style.display = 'block';
+    btn.hidden = true;
+
+    video.currentTime = 0;
+    video.play();
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const BG = [253, 253, 253];   // sampled background color of the source clip
+    const CUTOFF = 28;            // distance below this = fully transparent
+    const FEATHER = 45;           // soft ramp width above CUTOFF, avoids jagged edges
+
+    function tick() {
+      if (video.paused || video.ended) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = frame.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const dr = d[i] - BG[0], dg = d[i + 1] - BG[1], db = d[i + 2] - BG[2];
+        const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+        d[i + 3] = dist < CUTOFF ? 0 : Math.min(255, Math.round(255 * (dist - CUTOFF) / FEATHER));
+      }
+      ctx.putImageData(frame, 0, 0);
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    video.onended = () => {
+      canvas.style.display = 'none';
+      poster.style.display = 'block';
+      btn.hidden = false;
+    };
+  }
 
   /* ── LOAD DATA ── */
   async function loadAll() {
