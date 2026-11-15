@@ -184,10 +184,10 @@
   ════════════════════════════════ */
   /* ── PRODUCT CAROUSEL (horizontal coverflow) ── */
   .carousel-section { background: var(--bg); padding: clamp(3rem,8vw,6rem) 5% clamp(2.5rem,5vw,4rem); overflow: hidden; }
-  .carousel-viewport { position: relative; height: clamp(300px, 42vw, 400px); max-width: 1100px; margin: 0 auto; perspective: 1400px; touch-action: pan-y; }
+  .carousel-viewport { position: relative; height: clamp(300px, 42vw, 400px); max-width: 1320px; margin: 0 auto; perspective: 1400px; touch-action: pan-y; }
   .carousel-stage { position: absolute; inset: 0; transform-style: preserve-3d; }
   .carousel-card {
-    position: absolute; top: 50%; left: 50%; width: clamp(150px, 20vw, 230px);
+    position: absolute; top: 50%; left: 50%; width: clamp(150px, 20vw, 220px);
     transform-style: preserve-3d; will-change: transform, opacity; cursor: pointer;
   }
   .carousel-card-inner {
@@ -247,27 +247,9 @@
   .contact-link svg { width: 18px; height: 18px; flex-shrink: 0; }
 
   /* ════════════════════════════════
-     SHOP — grouped by category, preview + show-more modal
+     SHOP — shared heading + product cards
   ════════════════════════════════ */
-  .shop-section { position: relative; z-index: 10; background: var(--bg); padding: clamp(3rem,6vw,5rem) 5% 4rem; }
   .shop-heading { font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; line-height: .95; text-align: center; font-size: clamp(3rem, 12vw, 9rem); margin-bottom: clamp(3rem, 6vw, 5rem); }
-
-  .category-block { max-width: 1200px; margin: 0 auto clamp(2rem, 4vw, 2.6rem); border-bottom: 1px solid var(--border); }
-  .category-block-head {
-    display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-    padding: clamp(1.4rem, 3vw, 1.8rem) 0; cursor: pointer; user-select: none;
-  }
-  .category-block-left { display: flex; align-items: center; gap: 1rem; }
-  .category-number { font-weight: 900; opacity: .3; font-size: clamp(2rem, 5vw, 3.6rem); line-height: 1; }
-  .category-title h3 { font-weight: 500; text-transform: uppercase; font-size: clamp(1.4rem, 3vw, 2rem); }
-  .category-title p { color: var(--text-dim); font-weight: 300; font-size: .9rem; max-width: 28rem; }
-  .category-block-right { display: flex; align-items: center; gap: 1rem; }
-  .btn-ghost { border-radius: 9999px; border: 2px solid var(--border-strong); color: var(--text); font-weight: 500; text-transform: uppercase; letter-spacing: .1em; padding: .55rem 1.4rem; font-size: .75rem; background: transparent; cursor: pointer; transition: background .2s; }
-  .btn-ghost:hover { background: rgba(240,217,192,.1); }
-  .category-chevron { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--border-strong); display: flex; align-items: center; justify-content: center; transition: transform .35s cubic-bezier(.22,1,.36,1); }
-  .category-block.collapsed .category-chevron { transform: rotate(-90deg); }
-  .category-body { overflow: hidden; height: 0; transition: height .4s cubic-bezier(.22,1,.36,1); }
-  .category-body-inner { padding-bottom: clamp(2rem, 4vw, 2.6rem); }
 
   .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
   @media (max-width: 760px) { .product-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -290,22 +272,60 @@
   .add-to-cart-btn.added { background: var(--surface); color: var(--text-faint); cursor: default; }
   .add-to-cart-btn svg { width: 15px; height: 15px; }
 
+  /* ── Product cards: play the fade-up only once a card scrolls into view
+     (.in-view is added by watchCards() in the script), lift on hover, and
+     slide an "Add to cart" bar up over the photo. The lift uses the separate
+     `translate` property because the fade-up animation holds on to `transform`. */
+  .product-card { animation-play-state: paused; transition: border-color .3s, translate .3s cubic-bezier(.22,1,.36,1), box-shadow .3s; }
+  .product-card.in-view { animation-play-state: running; }
+  .product-quick-add {
+    display: none; position: absolute; left: 8px; right: 8px; bottom: 8px; border: 0; border-radius: 10px;
+    background: var(--text); color: var(--bg); font-family: inherit; font-size: .7rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; padding: .6rem .5rem; cursor: pointer;
+    opacity: 0; transform: translateY(calc(100% + 10px)); transition: transform .3s cubic-bezier(.22,1,.36,1), opacity .2s;
+  }
+  .product-quick-add.added { background: var(--bg); color: var(--text); }
+  /* Hover effects only where there is a real pointer -- on phones the round
+     cart button under the photo stays the way to add an item. */
+  @media (hover: hover) {
+    .product-card:hover { translate: 0 -5px; box-shadow: 0 14px 28px rgba(58,36,22,.12); }
+    .product-quick-add { display: block; }
+    .product-card:hover .product-quick-add, .product-quick-add:focus-visible { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .product-card { animation: none; opacity: 1; }
+    .product-card:hover { translate: none; }
+  }
+
+  /* ── Shop (all products): compact grid ── */
+  #allProductsGrid { grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  @media (max-width: 1000px) { #allProductsGrid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 760px) { #allProductsGrid { grid-template-columns: repeat(2, 1fr); } }
+
   .skel-card { border-radius: 22px; border: 2px solid var(--border); overflow: hidden; }
   .skel-img { aspect-ratio: 4/5; background: linear-gradient(90deg, var(--surface) 25%, rgba(240,217,192,.14) 37%, var(--surface) 63%); background-size: 400px 100%; animation: shimmer 1.4s linear infinite; }
 
   /* ════════════════════════════════
-     CATEGORIES (tiles)
+     SHOP CATEGORY TILES
   ════════════════════════════════ */
-  .categories-section { position: relative; z-index: 10; background: var(--bg); padding: 0 5% clamp(3rem,6vw,5rem); text-align: center; }
-  .categories-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; text-align: left; }
-  @media (max-width: 900px) { .categories-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 480px) { .categories-grid { grid-template-columns: 1fr; } }
-  .category-tile { border: 2px solid var(--border); border-radius: 24px; overflow: hidden; cursor: pointer; background: none; text-align: left; font-family: inherit; transition: border-color .3s, transform .3s; display: flex; flex-direction: column; }
-  .category-tile:hover { border-color: var(--border-strong); transform: translateY(-4px); }
-  .category-tile img { width: 100%; aspect-ratio: 4/3; object-fit: cover; }
-  .category-tile-body { padding: 1rem 1.1rem 1.2rem; }
-  .category-tile-body h4 { font-weight: 500; text-transform: uppercase; font-size: 1rem; color: var(--text); margin-bottom: .3rem; }
-  .category-tile-body span { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+  /* Category tiles sit directly above the Shop grid and filter it in place. */
+  .shop-tiles { display: flex; gap: .8rem; overflow-x: auto; padding: 5px 2px 10px; margin-bottom: 1.2rem; scrollbar-width: thin; scroll-snap-type: x proximity; }
+  .shop-tiles:empty { display: none; }
+  .shop-tile {
+    flex: 0 0 clamp(124px, 15vw, 164px); display: flex; flex-direction: column; padding: 0; overflow: hidden;
+    border: 2px solid var(--border); border-radius: 18px; background: none; color: var(--text);
+    font-family: inherit; text-align: left; cursor: pointer; scroll-snap-align: start;
+    transition: border-color .3s, background .3s, color .3s, translate .3s cubic-bezier(.22,1,.36,1);
+  }
+  .shop-tile img { width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: center 25%; background: var(--surface); }
+  .shop-tile-body { display: flex; flex-direction: column; gap: 2px; padding: .6rem .75rem .7rem; }
+  .shop-tile-name { font-weight: 500; text-transform: uppercase; font-size: .8rem; line-height: 1.25; }
+  .shop-tile-count { font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+  .shop-tile.active { border-color: var(--text); background: var(--text); color: var(--bg); }
+  .shop-tile.active .shop-tile-count { color: inherit; opacity: .7; }
+  @media (hover: hover) { .shop-tile:hover { border-color: var(--border-strong); translate: 0 -3px; } }
+  .shop-cat-desc { color: var(--text-dim); font-size: .88rem; margin: -.3rem 0 1.2rem; }
+  .shop-cat-desc:empty { display: none; }
 
   /* ════════════════════════════════
      ALL PRODUCTS (flat grid + search)
@@ -318,16 +338,6 @@
   .search-wrap input { border: none; outline: none; background: transparent; font-family: inherit; font-size: .85rem; color: var(--text); width: 100%; }
   .search-wrap input::placeholder { color: var(--text-faint); }
   .no-products-msg { text-align: center; color: var(--text-dim); padding: 2rem 0; }
-
-  /* ── CATEGORY "SHOW MORE" MODAL ── */
-  .modal-backdrop { display: none; position: fixed; inset: 0; z-index: 9000; background: rgba(36,23,18,.94); backdrop-filter: blur(6px); align-items: flex-start; justify-content: center; padding: clamp(2.5rem,6vw,5rem) 1.5rem; overflow-y: auto; }
-  .modal-backdrop.open { display: flex; }
-  .modal-box { width: 100%; max-width: 72rem; background: var(--bg); border: 2px solid var(--border-strong); border-radius: 32px; padding: clamp(1.6rem, 4vw, 2.6rem); }
-  .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: clamp(2rem,4vw,3.2rem); }
-  .modal-head .eyebrow { font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
-  .modal-head h3 { font-weight: 900; text-transform: uppercase; line-height: .95; font-size: clamp(1.8rem, 5vw, 3.6rem); }
-  .modal-close { flex-shrink: 0; width: 42px; height: 42px; border-radius: 9999px; border: 2px solid var(--border-strong); background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: background .2s; }
-  .modal-close:hover { background: rgba(240,217,192,.1); }
 
   /* ── LIGHTBOX ── */
   #lightbox { display: none; position: fixed; inset: 0; background: rgba(36,23,18,.94); backdrop-filter: blur(6px); z-index: 10000; align-items: center; justify-content: center; padding: 2rem; cursor: pointer; }
@@ -444,29 +454,19 @@
   <a href="#all-products" class="btn-pill">Shop Now</a>
 </section>
 
-<!-- ════ ALL PRODUCTS (flat grid + search, no heading) ════ -->
+<!-- ════ SHOP (search + category tiles that filter the grid below) ════ -->
 <section class="all-products-section" id="all-products">
   <div class="all-products-bar">
-    <span class="all-products-label">Shop</span>
+    <span class="all-products-label" id="shopLabel">Shop</span>
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <input type="text" id="productSearch" placeholder="Search products by name…" oninput="filterAllProducts()" />
     </div>
   </div>
+  <div class="shop-tiles" id="shopTiles" role="group" aria-label="Filter products by category"></div>
+  <p class="shop-cat-desc" id="shopCatDesc"></p>
   <div class="product-grid" id="allProductsGrid"></div>
   <p class="no-products-msg" id="allProductsEmpty" style="display:none;">No products match your search.</p>
-</section>
-
-<!-- ════ CATEGORIES (tiles, jump to a category below) ════ -->
-<section class="categories-section reveal" id="categories">
-  <h2 class="shop-heading hero-heading" style="font-size: clamp(2.2rem, 7vw, 5rem); margin-bottom: clamp(2rem, 4vw, 3rem);">Categories</h2>
-  <div class="categories-grid" id="categoriesGrid"></div>
-</section>
-
-<!-- ════ CATEGORY DETAIL (each row jumped to + opened from a category link) ════ -->
-<section class="shop-section" id="shop">
-  <h2 class="shop-heading hero-heading" style="font-size: clamp(2.2rem, 7vw, 5rem); margin-bottom: clamp(2rem, 4vw, 3rem);">Browse by Category</h2>
-  <div id="shopCategories"></div>
 </section>
 
 <!-- ════ CONTACT ════ -->
@@ -485,19 +485,6 @@
   </div>
 </section>
 
-<!-- CATEGORY "SHOW MORE" MODAL -->
-<div class="modal-backdrop" id="categoryModal" onclick="if(event.target===this) closeCategoryModal()">
-  <div class="modal-box">
-    <div class="modal-head">
-      <div>
-        <p class="eyebrow" id="modalCount"></p>
-        <h3 class="hero-heading" id="modalTitle"></h3>
-      </div>
-      <button class="modal-close" onclick="closeCategoryModal()" aria-label="Close">✕</button>
-    </div>
-    <div class="product-grid" id="modalGrid"></div>
-  </div>
-</div>
 
 <!-- CART BACKDROP -->
 <div id="cart-backdrop" onclick="closeCart()"></div>
@@ -543,7 +530,6 @@
 <script>
   const API = '';
   const WHATSAPP = '96171479459'; // WhatsApp number, digits only (country code first, no + or spaces)
-  const PREVIEW_COUNT = 3;
 
   // ?v=2 cache-busts these -- bump it again if the images are ever replaced in place,
   // since browsers cache image URLs aggressively and a same-path overwrite can stick.
@@ -559,6 +545,23 @@
 
   let allProducts = [];
   let allCategories = [];
+  let shopCategoryId = null; // category tile selected in the Shop grid; null = "All"
+
+  // Product cards start hidden and fade up when they scroll into view.
+  // watchCards() must be called after any code that inserts product cards.
+  const cardObserver = typeof IntersectionObserver !== 'undefined'
+    ? new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) { e.target.classList.add('in-view'); cardObserver.unobserve(e.target); }
+        });
+      }, { threshold: 0.1 })
+    : null;
+
+  function watchCards(root) {
+    root.querySelectorAll('.product-card:not(.in-view)').forEach((card) => {
+      if (cardObserver) cardObserver.observe(card); else card.classList.add('in-view');
+    });
+  }
   // The cart is kept in localStorage so it survives closing the tab or the
   // browser. Storage can be unavailable (private mode, blocked cookies) or hold
   // something unreadable, so every access is guarded and falls back to an
@@ -777,9 +780,8 @@
       allCategories = []; allProducts = [];
     }
     renderCarousel();
-    renderShop();
-    renderCategoriesGrid();
     renderCategoriesDropdown();
+    renderShopTiles();
     renderAllProducts();
     updateBadge();
   }
@@ -795,7 +797,7 @@
     }
 
     panel.innerHTML = usedCats.map(cat =>
-      `<button type="button" onclick="scrollToCategory(${cat.id}); closeCategoriesDropdown();">${esc(cat.name)}</button>`
+      `<button type="button" onclick="setShopCategory(${cat.id}, true); closeCategoriesDropdown();">${esc(cat.name)}</button>`
     ).join('');
   }
 
@@ -815,44 +817,21 @@
     if (wrap && wrap.classList.contains('open') && !wrap.contains(e.target)) closeCategoriesDropdown();
   });
 
-  /* ── CATEGORIES (tiles) ── */
-  function renderCategoriesGrid() {
-    const grid = document.getElementById('categoriesGrid');
-    const usedCats = allCategories.filter(c => allProducts.some(p => p.categoryId === c.id));
-
-    if (usedCats.length === 0) {
-      grid.innerHTML = '';
-      return;
-    }
-
-    grid.innerHTML = usedCats.map(cat => {
-      const products = allProducts.filter(p => p.categoryId === cat.id);
-      const cover = products[0] ? thumbOf(products[0]) : GAZE_SRC.center;
-      return `
-      <button class="category-tile" onclick="scrollToCategory(${cat.id})">
-        <img src="${esc(cover)}" alt="${esc(cat.name)}" loading="lazy" />
-        <div class="category-tile-body">
-          <h4>${esc(cat.name)}</h4>
-          <span>${products.length} product${products.length === 1 ? '' : 's'}</span>
-        </div>
-      </button>`;
-    }).join('');
-  }
-
-  function scrollToCategory(catId) {
-    const block = document.getElementById(`cat-block-${catId}`);
-    if (!block) return;
-    if (block.classList.contains('collapsed')) toggleCategory(catId);
-    block.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
   /* ── ALL PRODUCTS (flat grid + search) ── */
   function renderAllProducts() {
     const query = (document.getElementById('productSearch').value || '').trim().toLowerCase();
-    const filtered = query ? allProducts.filter(p => p.label.toLowerCase().includes(query)) : allProducts;
+    const filtered = allProducts.filter(p =>
+      (shopCategoryId == null || p.categoryId === shopCategoryId) &&
+      (!query || p.label.toLowerCase().includes(query)));
 
     const grid = document.getElementById('allProductsGrid');
     const empty = document.getElementById('allProductsEmpty');
+
+    // "Shop · 7 products" / "Bags & Totes · 3 products", plus the category's description if it has one.
+    const activeCat = allCategories.find(c => c.id === shopCategoryId);
+    document.getElementById('shopLabel').textContent =
+      `${activeCat ? activeCat.name : 'Shop'} · ${filtered.length} product${filtered.length === 1 ? '' : 's'}`;
+    document.getElementById('shopCatDesc').textContent = activeCat && activeCat.description ? activeCat.description : '';
 
     if (filtered.length === 0) {
       grid.innerHTML = '';
@@ -862,6 +841,44 @@
 
     empty.style.display = 'none';
     grid.innerHTML = filtered.map((p, i) => productCardHtml(p, i)).join('');
+    watchCards(grid);
+  }
+
+  // Category tiles above the Shop grid: a photo, the name and a product count.
+  // Clicking one filters the grid in place. Only categories that actually have
+  // products get a tile, and with fewer than two there is nothing to filter.
+  function renderShopTiles() {
+    const row = document.getElementById('shopTiles');
+    const usedCats = allCategories.filter(c => allProducts.some(p => p.categoryId === c.id));
+    if (usedCats.length < 2) { row.innerHTML = ''; shopCategoryId = null; return; }
+    if (!usedCats.some(c => c.id === shopCategoryId)) shopCategoryId = null;
+
+    const tile = (id, name, cover, count) => `
+      <button type="button" class="shop-tile${shopCategoryId === id ? ' active' : ''}" data-cat="${id}" aria-pressed="${shopCategoryId === id}" onclick="setShopCategory(${id})">
+        <img src="${esc(cover)}" alt="" loading="lazy" />
+        <span class="shop-tile-body">
+          <span class="shop-tile-name">${esc(name)}</span>
+          <span class="shop-tile-count">${count} product${count === 1 ? '' : 's'}</span>
+        </span>
+      </button>`;
+
+    row.innerHTML = tile(null, 'All', GAZE_SRC.center, allProducts.length) + usedCats.map((c) => {
+      const products = allProducts.filter(p => p.categoryId === c.id);
+      return tile(c.id, c.name, thumbOf(products[0]), products.length);
+    }).join('');
+  }
+
+  // scrollToShop = true when called from outside the Shop section (the nav
+  // "Categories" menu), so the visitor is taken to the filtered grid.
+  function setShopCategory(id, scrollToShop) {
+    shopCategoryId = id;
+    document.querySelectorAll('#shopTiles .shop-tile').forEach((el) => {
+      const on = el.dataset.cat === String(id);
+      el.classList.toggle('active', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+    renderAllProducts();
+    if (scrollToShop) document.getElementById('all-products').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function filterAllProducts() {
@@ -946,6 +963,20 @@
     const half = count / 2;
     const gap = 22;
 
+    // "Soft tilt" layout: side cards turn only slightly and stay fully
+    // visible, instead of swinging almost edge-on and fading away.
+    // Two neighbours show on each side when there is room for five cards
+    // between the arrows, otherwise one on each side (phones).
+    const stageW = cards[0].parentElement.offsetWidth;
+    const arrowSpace = stageW < 560 ? 40 : 60;
+    const room = stageW / 2 - arrowSpace - cardW / 2; // furthest a card centre can sit and stay clear of the arrows
+    const showFive = room / 2 >= cardW * 0.85;
+    const sideCount = showFive ? 2 : 1;
+    const step = showFive
+      ? Math.min(cardW + gap, room / 2)
+      : Math.min(cardW + gap, Math.max(room, cardW * 0.72));
+    const smooth = (t) => { const c = Math.min(Math.max(t, 0), 1); return c * c * (3 - 2 * c); };
+
     cards.forEach((card) => {
       const i = parseInt(card.dataset.index, 10);
       let offset = i - virtualActive;
@@ -955,113 +986,25 @@
       const abs = Math.abs(offset);
       const sign = Math.sign(offset);
 
-      if (abs > 3.2) {
+      // Cards beyond the visible neighbours fade out over the next 0.6 of a step.
+      const opacity = 1 - smooth((abs - sideCount) / 0.6);
+      if (opacity <= 0) {
         card.style.opacity = '0';
         card.style.pointerEvents = 'none';
         return;
       }
-      let x, z, rot, opacity;
-      if (abs <= 1) {
-        const t = abs;
-        const e = t * t * (3 - 2 * t);
-        x = -sign * e * (cardW + gap);
-        z = -e * 130;
-        rot = e * 46; // capped well under 90deg so we never need a card back-face
-        opacity = 1;
-      } else {
-        const t = Math.min((abs - 1) / 1.6, 1);
-        const e = t * t * (3 - 2 * t);
-        const xStart = cardW + gap;
-        const xEnd = cardW * 1.9 + gap;
-        x = -sign * (xStart + e * (xEnd - xStart));
-        z = -130 - e * 160;
-        rot = 46 + e * 26;
-        opacity = 1 - e; // fade out as it nears the edge
-      }
+
+      const near = smooth(abs);      // 0 at centre -> 1 at the first neighbour
+      const far = smooth(abs - 1);   // 0 at the first neighbour -> 1 at the second
+      const x = -sign * abs * step;
+      const z = -(near * 30 + far * 30);
+      const rot = near * 12 + far * 4; // 12deg for the first neighbour, 16deg for the second
+
       card.style.zIndex = String(2000 - Math.round(abs * 100));
-      card.style.opacity = Math.max(0, opacity).toFixed(3);
-      card.style.pointerEvents = abs < 2.4 ? 'auto' : 'none';
+      card.style.opacity = opacity.toFixed(3);
+      card.style.pointerEvents = opacity > 0.5 ? 'auto' : 'none';
       card.style.transform = `translate(-50%, -50%) translateX(${x.toFixed(2)}px) translateZ(${z.toFixed(2)}px) rotateY(${(-sign * rot).toFixed(2)}deg)`;
     });
-  }
-
-  /* ── SHOP: category blocks + show-more modal ── */
-  function renderShop() {
-    const wrap = document.getElementById('shopCategories');
-    const usedCats = allCategories.filter(c => allProducts.some(p => p.categoryId === c.id));
-
-    if (usedCats.length === 0) {
-      wrap.innerHTML = '<p style="text-align:center;color:var(--text-dim);">No products yet — check back soon!</p>';
-      return;
-    }
-
-    wrap.innerHTML = usedCats.map((cat, ci) => {
-      const products = allProducts.filter(p => p.categoryId === cat.id);
-      const preview = products.slice(0, PREVIEW_COUNT);
-      const num = String(ci + 1).padStart(2, '0');
-      const isOpen = false; // all closed by default -- opened only via a category link/tile click
-      return `
-      <div class="category-block${isOpen ? '' : ' collapsed'}" id="cat-block-${cat.id}">
-        <div class="category-block-head" onclick="toggleCategory(${cat.id})" role="button" tabindex="0"
-             aria-expanded="${isOpen}" aria-controls="cat-body-${cat.id}"
-             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCategory(${cat.id});}">
-          <div class="category-block-left">
-            <span class="category-number hero-heading">${num}</span>
-            <div class="category-title">
-              <h3>${esc(cat.name)}</h3>
-              ${cat.description ? `<p>${esc(cat.description)}</p>` : ''}
-            </div>
-          </div>
-          <div class="category-block-right">
-            ${products.length > PREVIEW_COUNT ? `<button class="btn-ghost" onclick="event.stopPropagation(); openCategoryModal(${cat.id})">Show More</button>` : ''}
-            <span class="category-chevron" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </span>
-          </div>
-        </div>
-        <div class="category-body" id="cat-body-${cat.id}">
-          <div class="category-body-inner">
-            <div class="product-grid">${preview.map((p, i) => productCardHtml(p, i)).join('')}</div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Set initial collapsed/open heights with no transition (avoid a flash on load).
-    usedCats.forEach((cat) => setCategoryBodyHeight(cat.id, false, false));
-  }
-
-  function setCategoryBodyHeight(catId, open, animate) {
-    const body = document.getElementById(`cat-body-${catId}`);
-    if (!body) return;
-
-    if (open) {
-      const target = body.scrollHeight;
-      body.style.height = target + 'px';
-      if (animate) {
-        const onEnd = (e) => {
-          if (e.propertyName !== 'height') return;
-          body.style.height = 'auto';
-          body.removeEventListener('transitionend', onEnd);
-        };
-        body.addEventListener('transitionend', onEnd);
-      } else {
-        body.style.height = 'auto';
-      }
-    } else {
-      // Force an explicit starting height so the collapse can animate from it.
-      body.style.height = body.scrollHeight + 'px';
-      body.getBoundingClientRect(); // force reflow
-      body.style.height = '0px';
-    }
-  }
-
-  function toggleCategory(catId) {
-    const block = document.getElementById(`cat-block-${catId}`);
-    if (!block) return;
-    const nowCollapsed = block.classList.toggle('collapsed');
-    block.querySelector('.category-block-head').setAttribute('aria-expanded', String(!nowCollapsed));
-    setCategoryBodyHeight(catId, !nowCollapsed, true);
   }
 
   const CART_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>';
@@ -1071,10 +1014,11 @@
     const inCart = cart.some(c => c.id === p.id);
     const desc = p.description && p.description.trim() ? p.description : 'Handmade with care, one stitch at a time.';
     return `
-    <div class="product-card" style="--i:${i}">
+    <div class="product-card" style="--i:${i % 4}">
       <div class="product-img-wrap" onclick="openProductLightbox(${p.id})">
         <span class="product-tag">${esc(p.categoryName)}</span>
         <img src="${esc(thumbOf(p))}" alt="${esc(p.label)}" loading="lazy" />
+        <button type="button" class="product-quick-add ${inCart ? 'added' : ''}" data-atc-bar="${p.id}" onclick="event.stopPropagation(); toggleCart(${p.id})">${inCart ? 'In cart ✓' : 'Add to cart'}</button>
       </div>
       <div class="product-info">
         <span class="product-name">${esc(p.label)}</span>
@@ -1087,21 +1031,6 @@
         </button>
       </div>
     </div>`;
-  }
-
-  function openCategoryModal(catId) {
-    const cat = allCategories.find(c => c.id === catId);
-    const products = allProducts.filter(p => p.categoryId === catId);
-    document.getElementById('modalCount').textContent = `${products.length} products`;
-    document.getElementById('modalTitle').textContent = cat.name;
-    document.getElementById('modalGrid').innerHTML = products.map((p, i) => productCardHtml(p, i)).join('');
-    document.getElementById('categoryModal').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeCategoryModal() {
-    document.getElementById('categoryModal').classList.remove('open');
-    document.body.style.overflow = '';
   }
 
   /* ── CART STATE ── */
@@ -1126,12 +1055,16 @@
   function clearCart() {
     cart = [];
     saveCart(); updateBadge(); renderDrawer();
-    // Cart is empty now, so every add-to-cart button everywhere (Shop preview,
-    // open category modal, All Products grid) resets to its default state.
+    // Cart is empty now, so every add-to-cart button (carousel and Shop grid)
+    // resets to its default state.
     document.querySelectorAll('.add-to-cart-btn').forEach((btn) => {
       btn.innerHTML = CART_ICON;
       btn.classList.remove('added');
       btn.setAttribute('aria-label', 'Add to cart');
+    });
+    document.querySelectorAll('.product-quick-add').forEach((bar) => {
+      bar.textContent = 'Add to cart';
+      bar.classList.remove('added');
     });
   }
 
@@ -1143,14 +1076,18 @@
   }
 
   function updateCardBtn(id) {
-    // A product can appear in several places at once (Shop preview, category
-    // modal, All Products grid) so every matching button must be updated, not
-    // just the first -- data-atc is not a unique id like the old atc-{id} was.
+    // A product appears in more than one place at once (the carousel and the
+    // Shop grid), so every matching button must be updated, not just the first.
     const inCart = cart.some(c => c.id === id);
     document.querySelectorAll(`[data-atc="${id}"]`).forEach((btn) => {
       btn.innerHTML = inCart ? CHECK_ICON : CART_ICON;
       btn.classList.toggle('added', inCart);
       btn.setAttribute('aria-label', inCart ? 'Added to cart' : 'Add to cart');
+    });
+    // ...and the same for the "Add to cart" bar that slides over the photo on hover.
+    document.querySelectorAll(`[data-atc-bar="${id}"]`).forEach((bar) => {
+      bar.textContent = inCart ? 'In cart ✓' : 'Add to cart';
+      bar.classList.toggle('added', inCart);
     });
   }
 
@@ -1219,7 +1156,7 @@
   }
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeLightbox(); closeCart(); closeCategoryModal(); closeCategoriesDropdown(); }
+    if (e.key === 'Escape') { closeLightbox(); closeCart(); closeCategoriesDropdown(); }
   });
 
   window.addEventListener('load', loadAll);
