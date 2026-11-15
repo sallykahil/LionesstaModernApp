@@ -1,5 +1,6 @@
 using LionessstaAPI.Data;
 using LionessstaAPI.DTOs;
+using LionessstaAPI.Helpers;
 using LionessstaAPI.Models;
 using LionessstaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -45,8 +46,25 @@ namespace LionessstaAPI.Controllers
             CategoryName = img.Category?.Name ?? string.Empty,
             CategorySlug = img.Category?.Slug ?? string.Empty,
             ImageUrl = img.ImageUrl,
+            ThumbnailUrl = ImageUrlHelper.ThumbnailFor(img.ImageUrl),
             CreatedAt = img.CreatedAt
         };
+
+        // Shared by upload and replace-photo. Returns an error message, or null if the file is fine.
+        private static string? ValidateFile(IFormFile? file)
+        {
+            if (file == null || file.Length == 0)
+                return "No file provided.";
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType.ToLower()))
+                return "Only JPEG, PNG and WebP allowed.";
+
+            if (file.Length > 10 * 1024 * 1024)
+                return "Max file size is 10MB.";
+
+            return null;
+        }
 
         // GET /api/images
         // GET /api/images?categorySlug=bags
@@ -109,15 +127,9 @@ namespace LionessstaAPI.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Upload([FromForm] ImageUploadDto dto)
         {
-            if (dto.File == null || dto.File.Length == 0)
-                return BadRequest(new { message = "No file provided." });
-
-            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
-            if (!allowedTypes.Contains(dto.File.ContentType.ToLower()))
-                return BadRequest(new { message = "Only JPEG, PNG and WebP allowed." });
-
-            if (dto.File.Length > 10 * 1024 * 1024)
-                return BadRequest(new { message = "Max file size is 10MB." });
+            var fileError = ValidateFile(dto.File);
+            if (fileError != null)
+                return BadRequest(new { message = fileError });
 
             var category = await _db.Categories.FindAsync(dto.CategoryId);
             if (category == null)
@@ -127,7 +139,8 @@ namespace LionessstaAPI.Controllers
             {
                 using var stream = dto.File.OpenReadStream();
 
-                // BlobService handles resize + Azure upload, returns public URL
+                // BlobService handles resize + WebP conversion + thumbnail + Azure upload,
+                // and returns the public URL of the full-size photo
                 var imageUrl = await _blobService.UploadImageAsync(
                     stream,
                     dto.File.FileName,
@@ -152,6 +165,11 @@ namespace LionessstaAPI.Controllers
                 image.Category = category;
 
                 return CreatedAtAction(nameof(GetById), new { id = image.Id }, ToDto(image));
+            }
+            catch (Exception ex) when (ex is SixLabors.ImageSharp.UnknownImageFormatException or SixLabors.ImageSharp.InvalidImageContentException)
+            {
+                // The file had an image extension/type but isn't a readable image.
+                return BadRequest(new { message = "That file could not be read as an image. Please try a different photo." });
             }
             catch (Exception ex)
             {
@@ -198,6 +216,57 @@ namespace LionessstaAPI.Controllers
             return Ok(new { message = "Updated successfully." });
         }
 
+        // POST /api/images/5/photo
+        // Admin only — swaps the photo of an existing product (form field: "file").
+        // Label, category, price and description are untouched.
+        [HttpPost("{id}/photo")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ReplacePhoto(int id, IFormFile? file)
+        {
+            var fileError = ValidateFile(file);
+            if (fileError != null)
+                return BadRequest(new { message = fileError });
+
+            var image = await _db.ProductImages.Include(img => img.Category)
+                .FirstOrDefaultAsync(img => img.Id == id);
+
+            if (image == null)
+                return NotFound(new { message = $"Image {id} not found." });
+
+            var oldUrl = image.ImageUrl;
+
+            try
+            {
+                using var stream = file!.OpenReadStream();
+                image.ImageUrl = await _blobService.UploadImageAsync(stream, file.FileName, file.ContentType);
+
+                await _db.SaveChangesAsync();
+                _cache.Remove(ImagesCacheKey);
+            }
+            catch (Exception ex) when (ex is SixLabors.ImageSharp.UnknownImageFormatException or SixLabors.ImageSharp.InvalidImageContentException)
+            {
+                return BadRequest(new { message = "That file could not be read as an image. Please try a different photo." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Photo replace failed for image {Id}", id);
+                return StatusCode(500, new { message = "Photo replace failed. Please try again." });
+            }
+
+            // The product already points at the new photo, so a failure here only
+            // leaves an unused file in storage -- not worth failing the request over.
+            try
+            {
+                await _blobService.DeleteImageAsync(oldUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete old photo {Url} for image {Id}", oldUrl, id);
+            }
+
+            return Ok(ToDto(image));
+        }
+
         // DELETE /api/images/5
         // Admin only — deletes from Azure Blob AND from the database
         [HttpDelete("{id}")]
@@ -222,7 +291,7 @@ namespace LionessstaAPI.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Delete error: {ex.Message}");
+                _logger.LogError(ex, "Delete failed for image {Id}", id);
                 return StatusCode(500, new { message = "Delete failed. Please try again." });
             }
         }

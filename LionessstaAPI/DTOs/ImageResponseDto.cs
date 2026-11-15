@@ -11,7 +11,8 @@ namespace LionessstaAPI.DTOs
         public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string CategorySlug { get; set; } = string.Empty;
-        public string ImageUrl { get; set; } = string.Empty; // Azure Blob public URL → goes into <img src="..."/>
+        public string ImageUrl { get; set; } = string.Empty; // Azure Blob public URL, full size → lightbox
+        public string ThumbnailUrl { get; set; } = string.Empty; // small version → grids, cards, cart (same as ImageUrl for older photos)
         public DateTime CreatedAt { get; set; }
     }
 }

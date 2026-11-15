@@ -8,7 +8,7 @@ A full-stack web application for **Lionessta** — a handmade crochet brand. It 
 
 - **Customers** can browse product photos, filter by category, add items to a cart, and place orders via WhatsApp.
 - **Admins** can log in to upload, edit, and delete product images through a browser-based dashboard.
-- Uploaded images are automatically resized and stored in Azure Blob Storage. Metadata is persisted in Azure SQL Database.
+- Uploaded images keep their original shape, are converted to WebP (full size + thumbnail) and stored in Azure Blob Storage. Metadata is persisted in Azure SQL Database.
 
 ---
 
@@ -39,8 +39,9 @@ A full-stack web application for **Lionessta** — a handmade crochet brand. It 
 - Secure login with JWT authentication
 - Drag-and-drop image upload
 - Image preview before upload
-- Automatic resize to 800×1000 px on upload
-- Edit label and category on any image
+- Automatic WebP conversion on upload: full size (max 1600 px) + thumbnail (max 600 px), no cropping
+- Edit label, category, price and description on any image
+- Replace the photo of an existing product
 - Delete image (removes from storage and database)
 - Category filter tabs
 
@@ -79,11 +80,12 @@ LionessstaAPI/
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | Public | Login and receive a JWT token |
+| `POST` | `/api/auth/login` | Public | Login and receive a JWT token (max 5 attempts per minute per IP) |
 | `GET` | `/api/images` | Public | List all images (optional `?category=`) |
 | `GET` | `/api/images/{id}` | Public | Get a single image by ID |
 | `POST` | `/api/images/upload` | Admin | Upload a new product image |
-| `PUT` | `/api/images/{id}` | Admin | Update image label or category |
+| `PUT` | `/api/images/{id}` | Admin | Update label, category, price or description |
+| `POST` | `/api/images/{id}/photo` | Admin | Replace the photo of an existing product (form field `file`) |
 | `DELETE` | `/api/images/{id}` | Admin | Delete image from storage and database |
 
 Protected endpoints require the header: `Authorization: Bearer <token>`
@@ -166,7 +168,8 @@ All configuration keys that must be set in your environment or secrets manager:
 | `Jwt:Issuer` | JWT issuer identifier |
 | `Jwt:Audience` | JWT audience identifier |
 | `Admin:Username` | Admin dashboard login username |
-| `Admin:Password` | Admin dashboard login password |
+| `Admin:PasswordHash` | Hashed admin password (preferred). Generate with `dotnet run -- hash-password "your-password"` |
+| `Admin:Password` | Plain-text admin password. Only read when `Admin:PasswordHash` is not set |
 
 For production, set these as **Azure App Service Application Settings** (environment variables) instead of storing them in `appsettings.json`.
 
@@ -202,10 +205,11 @@ ProductImages
 
 ## Known Limitations
 
-- Cart state is stored in `sessionStorage` — it clears when the browser tab is closed.
+- Cart state is stored in the browser's `localStorage` — it stays on that device/browser only.
 - Only one admin account is supported (configured in appsettings).
 - Orders are placed via WhatsApp — there is no integrated payment or order management system.
-- Images are always resized to 800×1000 px (portrait crop) regardless of the original aspect ratio.
+- Photos uploaded before the WebP pipeline were cropped to 800×1000 px JPEG and have no thumbnail. Use "Replace photo" in the admin dashboard with the original file to bring them up to date.
+- The social preview tags in `wwwroot/index.html` use the `azurewebsites.net` address — update them if the site moves to a custom domain.
 
 ---
 

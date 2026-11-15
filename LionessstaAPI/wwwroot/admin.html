@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lionessta Admin</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
 
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
@@ -522,7 +524,7 @@
                         <label class="file-label" for="prod-file" id="prod-file-label">Choose a photo…</label>
                         <input type="file" id="prod-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="onProductFileChange(this.files[0])" />
                     </div>
-                    <p class="field-error" id="prod-edit-photo-note" style="display:none;color:var(--text-faint);">To change the photo, delete this product and add it again.</p>
+                    <p class="field-error" id="prod-edit-photo-note" style="display:none;color:var(--text-faint);">Leave this empty to keep the current photo, or choose a new one to replace it.</p>
                 </div>
                 <div class="field">
                     <label>Name<span class="req">*</span></label>
@@ -581,6 +583,15 @@
     t.textContent = msg;
     t.className = `show ${type}`;
     setTimeout(() => t.className = '', 3000);
+  }
+
+  // Product and category text comes from the admin panel and is dropped into
+  // HTML below -- esc() makes sure characters like < > " ' are shown as text
+  // and can never be read by the browser as markup or script.
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
   }
 
   function formatPrice(price) {
@@ -698,14 +709,14 @@
     grid.innerHTML = allCategories.map(c => `
       <div class="category-card">
         <div class="category-card-top">
-          <h3>${c.name}</h3>
+          <h3>${esc(c.name)}</h3>
           <div class="category-card-actions">
             <button class="icon-btn" title="Edit" onclick="openCategoryModal(${c.id})">✎</button>
             <button class="btn-danger-ghost" title="Delete" onclick="confirmDeleteCategory(${c.id})">✕</button>
           </div>
         </div>
-        <span class="slug">/${c.slug}</span>
-        ${c.description ? `<p class="desc">${c.description}</p>` : ''}
+        <span class="slug">/${esc(c.slug)}</span>
+        ${c.description ? `<p class="desc">${esc(c.description)}</p>` : ''}
         <span class="count">${c.productCount} product${c.productCount === 1 ? '' : 's'}</span>
       </div>`).join('');
   }
@@ -722,13 +733,13 @@
     }
     grid.innerHTML = allProducts.map(p => `
       <div class="product-card">
-        <img src="${p.imageUrl}" alt="${p.label}" loading="lazy" />
+        <img src="${esc(p.thumbnailUrl || p.imageUrl)}" alt="${esc(p.label)}" loading="lazy" />
         <div class="product-card-body">
           <div class="cat-row">
-            <span class="cat">${p.categoryName}</span>
+            <span class="cat">${esc(p.categoryName)}</span>
             <span class="product-id">#${p.id}</span>
           </div>
-          <span class="name">${p.label}</span>
+          <span class="name">${esc(p.label)}</span>
           <span class="price hero-heading">${formatPrice(p.price)}</span>
           <div class="product-card-actions">
             <button class="icon-btn" title="Edit" onclick="openProductModal(${p.id})">✎</button>
@@ -824,7 +835,7 @@
       return;
     }
     select.innerHTML = allCategories.map(c =>
-      `<option value="${c.id}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${c.name}</option>`
+      `<option value="${c.id}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${esc(c.name)}</option>`
     ).join('');
   }
 
@@ -839,10 +850,10 @@
     document.getElementById('prod-description').value = prod ? (prod.description || '') : '';
     document.getElementById('prod-error').style.display = 'none';
     document.getElementById('prod-file').value = '';
-    document.getElementById('prod-file').disabled = !!prod;
+    document.getElementById('prod-file').disabled = false;
     document.getElementById('prod-file-req').style.display = prod ? 'none' : 'inline';
     document.getElementById('prod-edit-photo-note').style.display = prod ? 'block' : 'none';
-    document.getElementById('prod-file-label').textContent = prod ? 'Replace photo (not supported here)' : 'Choose a photo…';
+    document.getElementById('prod-file-label').textContent = prod ? 'Replace photo (optional)…' : 'Choose a photo…';
 
     const preview = document.getElementById('prod-file-preview');
     if (prod) { preview.src = prod.imageUrl; preview.style.display = 'block'; }
@@ -901,6 +912,13 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label, categoryId: Number(categoryId), price: Number(price), description }),
         });
+        // A new photo was chosen while editing -- swap it in (the old one is
+        // removed from storage by the server once the new one is saved).
+        if (selectedFile) {
+          const photoForm = new FormData();
+          photoForm.append('file', selectedFile);
+          await api(`/api/images/${id}/photo`, { method: 'POST', auth: true, body: photoForm });
+        }
       } else {
         const form = new FormData();
         form.append('File', selectedFile);

@@ -4,6 +4,21 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Lionessta — Handmade Crochet</title>
+<meta name="description" content="Handmade crochet bags, accessories and home pieces, made to order in Lebanon. Browse the collection and order on WhatsApp." />
+<link rel="canonical" href="https://lionessstaapi20260509115108-b8ckbwaebuchg8b8.francecentral-01.azurewebsites.net/" />
+<!-- Link preview shown when the site is shared on WhatsApp, Instagram, Facebook, LinkedIn.
+     If the site moves to its own domain, update the three URLs below (and the canonical above). -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Lionessta" />
+<meta property="og:title" content="Lionessta — Handmade Crochet" />
+<meta property="og:description" content="Handmade crochet bags, accessories and home pieces, made to order in Lebanon. Order on WhatsApp." />
+<meta property="og:url" content="https://lionessstaapi20260509115108-b8ckbwaebuchg8b8.francecentral-01.azurewebsites.net/" />
+<meta property="og:image" content="https://lionessstaapi20260509115108-b8ckbwaebuchg8b8.francecentral-01.azurewebsites.net/images/og-image.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#F7EFE3" />
+<link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -419,7 +434,7 @@
   <div class="about-video-wrap" id="aboutVideoWrap">
     <img class="about-video-poster" id="aboutVideoPoster" src="/images/hero-center.webp" alt="" />
     <canvas class="about-video-canvas" id="aboutVideoCanvas"></canvas>
-    <video id="aboutVideoSrc" src="/videos/lionessta-intro.mp4" playsinline preload="auto"
+    <video id="aboutVideoSrc" src="/videos/lionessta-intro.mp4" playsinline preload="metadata"
       style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;"></video>
     <button type="button" class="about-video-play" id="aboutVideoPlayBtn" onclick="playAboutIntro()" aria-label="Play introduction video">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -527,7 +542,7 @@
 
 <script>
   const API = '';
-  const WHATSAPP = '+96171479459'; // ← replace with your WhatsApp number (no + or spaces)
+  const WHATSAPP = '96171479459'; // WhatsApp number, digits only (country code first, no + or spaces)
   const PREVIEW_COUNT = 3;
 
   // ?v=2 cache-busts these -- bump it again if the images are ever replaced in place,
@@ -544,7 +559,28 @@
 
   let allProducts = [];
   let allCategories = [];
-  let cart = JSON.parse(sessionStorage.getItem('lion_cart') || '[]');
+  // The cart is kept in localStorage so it survives closing the tab or the
+  // browser. Storage can be unavailable (private mode, blocked cookies) or hold
+  // something unreadable, so every access is guarded and falls back to an
+  // empty / in-memory cart.
+  let cart = [];
+  try {
+    const savedCart = JSON.parse(localStorage.getItem('lion_cart') || '[]');
+    if (Array.isArray(savedCart)) cart = savedCart.filter(item => item && typeof item === 'object' && item.id != null);
+  } catch { cart = []; }
+
+  // Product and category text comes from the admin panel and is dropped into
+  // HTML below -- esc() makes sure characters like < > " ' are shown as text
+  // and can never be read by the browser as markup or script.
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+  }
+
+  // Small version of a product photo for grids/cards; older photos have none
+  // and simply use the full-size one.
+  function thumbOf(p) { return p.thumbnailUrl || p.imageUrl; }
 
   function formatPrice(price) {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price || 0);
@@ -725,6 +761,18 @@
       ]);
       allCategories = catRes.ok ? await catRes.json() : [];
       allProducts = prodRes.ok ? await prodRes.json() : [];
+
+      // A saved cart can now be days old: drop anything that has since been
+      // removed from the shop and refresh name/price/photo for the rest. Only
+      // when the product list really loaded -- a failed request must not
+      // empty someone's cart.
+      if (prodRes.ok) {
+        cart = cart
+          .map(item => allProducts.find(p => p.id === item.id))
+          .filter(Boolean)
+          .map(p => ({ id: p.id, label: p.label, category: p.categoryName, imageUrl: thumbOf(p), price: p.price }));
+        saveCart();
+      }
     } catch {
       allCategories = []; allProducts = [];
     }
@@ -747,7 +795,7 @@
     }
 
     panel.innerHTML = usedCats.map(cat =>
-      `<button type="button" onclick="scrollToCategory(${cat.id}); closeCategoriesDropdown();">${cat.name}</button>`
+      `<button type="button" onclick="scrollToCategory(${cat.id}); closeCategoriesDropdown();">${esc(cat.name)}</button>`
     ).join('');
   }
 
@@ -779,12 +827,12 @@
 
     grid.innerHTML = usedCats.map(cat => {
       const products = allProducts.filter(p => p.categoryId === cat.id);
-      const cover = products[0] ? products[0].imageUrl : GAZE_SRC.center;
+      const cover = products[0] ? thumbOf(products[0]) : GAZE_SRC.center;
       return `
       <button class="category-tile" onclick="scrollToCategory(${cat.id})">
-        <img src="${cover}" alt="${cat.name}" loading="lazy" />
+        <img src="${esc(cover)}" alt="${esc(cat.name)}" loading="lazy" />
         <div class="category-tile-body">
-          <h4>${cat.name}</h4>
+          <h4>${esc(cat.name)}</h4>
           <span>${products.length} product${products.length === 1 ? '' : 's'}</span>
         </div>
       </button>`;
@@ -837,19 +885,16 @@
     stage.innerHTML = carouselItems.map((p, i) => {
       const clickable = p.id != null;
       const inCart = clickable && cart.some(c => c.id === p.id);
-      const safeUrl = p.imageUrl.replace(/'/g, "\\'");
-      const safeLabel = (p.label || '').replace(/'/g, "\\'");
-      const safeCat = (p.categoryName || '').replace(/'/g, "\\'");
       const imgClick = clickable
-        ? `event.stopPropagation(); openLightbox('${safeUrl}','${safeLabel}','${safeCat}',${p.price})`
+        ? `event.stopPropagation(); openProductLightbox(${p.id})`
         : '';
       return `
       <div class="carousel-card" data-index="${i}" onclick="carouselCardClick(event, ${i})">
         <div class="carousel-card-inner">
-          <img src="${p.imageUrl}" alt="${p.label || ''}" loading="lazy" onclick="${imgClick}" />
+          <img src="${esc(thumbOf(p))}" alt="${esc(p.label)}" loading="lazy" onclick="${imgClick}" />
           ${clickable ? `
           <div class="carousel-card-body">
-            <span class="carousel-card-name">${p.label}</span>
+            <span class="carousel-card-name">${esc(p.label)}</span>
             <span class="carousel-card-price">${formatPrice(p.price)}</span>
             <button class="add-to-cart-btn ${inCart ? 'added' : ''}" data-atc="${p.id}" aria-label="${inCart ? 'Added to cart' : 'Add to cart'}" onclick="event.stopPropagation(); toggleCart(${p.id})">
               ${inCart ? CHECK_ICON : CART_ICON}
@@ -963,8 +1008,8 @@
           <div class="category-block-left">
             <span class="category-number hero-heading">${num}</span>
             <div class="category-title">
-              <h3>${cat.name}</h3>
-              ${cat.description ? `<p>${cat.description}</p>` : ''}
+              <h3>${esc(cat.name)}</h3>
+              ${cat.description ? `<p>${esc(cat.description)}</p>` : ''}
             </div>
           </div>
           <div class="category-block-right">
@@ -1024,19 +1069,16 @@
 
   function productCardHtml(p, i) {
     const inCart = cart.some(c => c.id === p.id);
-    const safeUrl = p.imageUrl.replace(/'/g, "\\'");
-    const safeLabel = p.label.replace(/'/g, "\\'");
-    const safeCat = p.categoryName.replace(/'/g, "\\'");
     const desc = p.description && p.description.trim() ? p.description : 'Handmade with care, one stitch at a time.';
     return `
     <div class="product-card" style="--i:${i}">
-      <div class="product-img-wrap" onclick="openLightbox('${safeUrl}','${safeLabel}','${safeCat}',${p.price})">
-        <span class="product-tag">${p.categoryName}</span>
-        <img src="${p.imageUrl}" alt="${p.label}" loading="lazy" />
+      <div class="product-img-wrap" onclick="openProductLightbox(${p.id})">
+        <span class="product-tag">${esc(p.categoryName)}</span>
+        <img src="${esc(thumbOf(p))}" alt="${esc(p.label)}" loading="lazy" />
       </div>
       <div class="product-info">
-        <span class="product-name">${p.label}</span>
-        <span class="product-desc">${desc}</span>
+        <span class="product-name">${esc(p.label)}</span>
+        <span class="product-desc">${esc(desc)}</span>
       </div>
       <div class="product-bottom-row">
         <span class="product-price">${formatPrice(p.price)}</span>
@@ -1068,7 +1110,7 @@
     if (!p) return;
     const idx = cart.findIndex(c => c.id === id);
     if (idx === -1) {
-      cart.push({ id: p.id, label: p.label, category: p.categoryName, imageUrl: p.imageUrl, price: p.price });
+      cart.push({ id: p.id, label: p.label, category: p.categoryName, imageUrl: thumbOf(p), price: p.price });
       saveCart(); updateBadge(); updateCardBtn(id); openCart();
     } else {
       cart.splice(idx, 1);
@@ -1093,7 +1135,7 @@
     });
   }
 
-  function saveCart() { sessionStorage.setItem('lion_cart', JSON.stringify(cart)); }
+  function saveCart() { try { localStorage.setItem('lion_cart', JSON.stringify(cart)); } catch {} }
 
   function updateBadge() {
     const count = document.getElementById('cart-count');
@@ -1135,12 +1177,12 @@
     footerEl.style.display = 'flex';
     itemsEl.innerHTML = cart.map(item => `
       <div class="cart-item">
-        <img src="${item.imageUrl}" alt="${item.label}" />
+        <img src="${esc(item.imageUrl)}" alt="${esc(item.label)}" />
         <div class="cart-item-info">
-          <strong>${item.label}</strong>
-          <span>${item.category} · ${formatPrice(item.price)}</span>
+          <strong>${esc(item.label)}</strong>
+          <span>${esc(item.category)} · ${formatPrice(item.price)}</span>
         </div>
-        <button class="cart-item-remove" onclick="removeFromCart(${item.id})">✕</button>
+        <button class="cart-item-remove" onclick="removeFromCart(${Number(item.id)})">✕</button>
       </div>`).join('');
   }
 
@@ -1156,6 +1198,13 @@
   }
 
   /* ── LIGHTBOX ── */
+  // Cards pass only the product id; the details are looked up here, so no
+  // product text ever has to be written into an onclick="" attribute.
+  function openProductLightbox(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (p) openLightbox(p.imageUrl, p.label, p.categoryName, p.price);
+  }
+
   function openLightbox(url, label, cat, price) {
     document.getElementById('lightbox-img').src = url;
     document.getElementById('lightbox-label').textContent = label;

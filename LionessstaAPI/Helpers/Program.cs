@@ -2,9 +2,20 @@
 using LionessstaAPI.Helpers;
 using LionessstaAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
+
+// One-off helper, not part of the running site:
+//   dotnet run -- hash-password "your-new-password"
+// prints the value to store in the Admin:PasswordHash setting, then exits.
+if (args.Length >= 2 && args[0] == "hash-password")
+{
+    Console.WriteLine(PasswordHelper.Hash(args[1]));
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,7 +60,30 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddCors();
+
+// ── LOGIN RATE LIMIT
+// The admin login is the only thing protecting uploads and deletes, and the
+// login page is public. Allow each visitor (by IP address) 5 attempts per
+// minute; anything beyond that gets a 429 until the minute is up.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { message = "Too many login attempts. Please wait a minute and try again." },
+            cancellationToken);
+    };
+    options.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 var app = builder.Build();
 
@@ -88,9 +122,27 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
-app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // Site artwork and the intro video rarely change (and the pages add
+        // ?v=N to their URLs when they do), so let browsers keep them for a
+        // week instead of re-downloading on every visit. The HTML pages are
+        // left alone so a new deploy shows up immediately.
+        var path = ctx.Context.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/images/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/videos/", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=604800";
+        }
+    }
+});
+
+// No CORS policy on purpose: the storefront and admin pages are served from
+// this same app, so no other website needs (or gets) browser access to the API.
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

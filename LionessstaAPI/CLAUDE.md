@@ -34,18 +34,21 @@ HTTP Request
 ```
 
 `Helpers/Program.cs` owns service registration and the middleware pipeline:
-static files → CORS → HTTPS redirect → authentication → authorization → controllers.
+static files → HTTPS redirect → rate limiter → authentication → authorization → controllers.
+No CORS policy: the frontend is served from the same origin.
 
 ### Authentication
 
 JWT Bearer (HMAC-SHA256, 8-hour expiry).  
 `POST /api/auth/login` validates credentials from config (`Admin` section) and returns a token.  
-`JwtHelper` generates tokens; admin credentials and the JWT secret (`Jwt` section) live in appsettings.  
+`JwtHelper` generates tokens; admin credentials and the JWT secret (`Jwt` section) live in configuration.  
+Password check: `Admin:PasswordHash` (PBKDF2, see `Helpers/PasswordHelper.cs`; generate with `dotnet run -- hash-password "..."`) if set, otherwise plain `Admin:Password`.  
+Login is rate limited (policy `login` in `Program.cs`: 5 attempts/minute per IP).  
 Protected endpoints use `[Authorize(Roles = "Admin")]`.
 
 ### Image Handling
 
-`BlobService` receives a raw upload, uses **SixLabors.ImageSharp** to crop/resize to **800×1000 px** and re-encode as JPEG, then uploads to Azure Blob Storage. The blob URL is stored in `ProductImage.ImageUrl`. Delete removes from both Blob and the database.
+`BlobService` receives a raw upload and uses **SixLabors.ImageSharp** to auto-rotate, strip metadata and scale it down without cropping, then stores two WebP blobs: `p_<guid>.webp` (max 1600 px) and `p_<guid>_thumb.webp` (max 600 px), both with a one-year `Cache-Control`. Only the full-size URL is stored in `ProductImage.ImageUrl`; the thumbnail URL is derived from it by `Helpers/ImageUrlHelper.cs` and returned as `ThumbnailUrl` (older `.jpg` photos have no thumbnail and return the full-size URL). Delete and replace-photo remove both blobs.
 
 ### Key Paths
 
@@ -70,4 +73,5 @@ Protected endpoints use `[Authorize(Roles = "Admin")]`.
 | GET | `/api/images/{id}` | — |
 | POST | `/api/images/upload` | Admin |
 | PUT | `/api/images/{id}` | Admin |
+| POST | `/api/images/{id}/photo` | Admin (replace photo, form field `file`) |
 | DELETE | `/api/images/{id}` | Admin |

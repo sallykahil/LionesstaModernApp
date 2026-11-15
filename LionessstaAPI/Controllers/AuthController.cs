@@ -1,6 +1,6 @@
 ﻿using LionessstaAPI.Helpers;
 using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LionessstaAPI.Controllers
 {
@@ -20,16 +20,37 @@ namespace LionessstaAPI.Controllers
         // POST /api/auth/login
         // Body: { "username": "admin", "password": "yourpassword" }
         // Returns: { "token": "eyJ..." }
+        //
+        // Limited to a few attempts per minute per visitor (the "login" policy in
+        // Program.cs) so the password can't be guessed by trying thousands of them.
         [HttpPost("login")]
+        [EnableRateLimiting("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
             var adminUsername = _config["Admin:Username"];
-            var adminPassword = _config["Admin:Password"];
+            var passwordHash = _config["Admin:PasswordHash"];
+            var plainPassword = _config["Admin:Password"];
 
-            if (request.Username != adminUsername || request.Password != adminPassword)
+            var username = request.Username ?? string.Empty;
+            var password = request.Password ?? string.Empty;
+
+            var usernameOk = !string.IsNullOrEmpty(adminUsername)
+                && PasswordHelper.FixedTimeEquals(username, adminUsername);
+
+            // Preferred: Admin:PasswordHash (see PasswordHelper for how to make one).
+            // Admin:Password (plain text) is only read when no hash is configured,
+            // so existing setups keep working until the hash is added.
+            bool passwordOk;
+            if (!string.IsNullOrEmpty(passwordHash))
+                passwordOk = PasswordHelper.Verify(password, passwordHash);
+            else
+                passwordOk = !string.IsNullOrEmpty(plainPassword)
+                    && PasswordHelper.FixedTimeEquals(password, plainPassword);
+
+            if (!usernameOk || !passwordOk)
                 return Unauthorized(new { message = "Invalid credentials." });
 
-            var token = _jwt.GenerateToken(request.Username);
+            var token = _jwt.GenerateToken(username);
             return Ok(new { token });
         }
     }
